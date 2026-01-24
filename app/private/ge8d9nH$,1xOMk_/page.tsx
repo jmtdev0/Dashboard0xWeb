@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { TestResult } from "@/lib/scraper";
 
-export default function Dashboard() {
+export default function PrivateDashboard() {
   const [data, setData] = useState<TestResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,108 +127,58 @@ export default function Dashboard() {
 
         {/* Dashboard Grid */}
         {data && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* YouTube Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* BTC Card */}
             <ServiceCard
-              title="YouTube (@jmtdev)"
-              icon="🎥"
-              status={data.results.youtube.success}
-              data={[
-                {
-                  label: "Last Video",
-                  value: data.results.youtube.lastVideo || "N/A",
-                },
-              ]}
-              error={data.results.youtube.error}
-              link="https://www.youtube.com/@jmtdev"
+              title="Bitcoin (BTC)"
+              icon="₿"
+              status={data.results.crypto.success}
+              data={
+                data.results.crypto.btc
+                  ? [
+                      {
+                        label: "Price (EUR)",
+                        value: `€${data.results.crypto.btc.price.toLocaleString()}`,
+                      },
+                      {
+                        label: "24h Change",
+                        value: `${data.results.crypto.btc.change24h.toFixed(2)}%`,
+                        color:
+                          data.results.crypto.btc.change24h >= 0
+                            ? "text-green-600"
+                            : "text-red-600",
+                      },
+                    ]
+                  : []
+              }
+              error={data.results.crypto.error}
             />
 
-            {/* Twitter Card */}
+            {/* SOL Card */}
             <ServiceCard
-              title="Twitter (@windyBotES)"
-              icon="🐦"
-              status={data.results.twitter.success}
-              data={[
-                {
-                  label: "Last Tweet",
-                  value: data.results.twitter.lastTweet || "N/A",
-                },
-                {
-                  label: "Total Tweets",
-                  value: data.results.twitter.totalTweets || "N/A",
-                },
-              ]}
-              error={data.results.twitter.error}
-              link="https://x.com/windyBotES"
+              title="Solana (SOL)"
+              icon="◎"
+              status={data.results.crypto.success}
+              data={
+                data.results.crypto.sol
+                  ? [
+                      {
+                        label: "Price (EUR)",
+                        value: `€${data.results.crypto.sol.price.toFixed(2)}`,
+                      },
+                      {
+                        label: "24h Change",
+                        value: `${data.results.crypto.sol.change24h.toFixed(2)}%`,
+                        color:
+                          data.results.crypto.sol.change24h >= 0
+                            ? "text-green-600"
+                            : "text-red-600",
+                      },
+                    ]
+                  : []
+              }
+              error={data.results.crypto.error}
             />
-
-            {/* Instagram Card */}
-            <ServiceCard
-              title="Instagram (@anainimaladay)"
-              icon="📷"
-              status={data.results.instagram.success}
-              data={[
-                {
-                  label: "Last Post",
-                  value: data.results.instagram.lastPost || "N/A",
-                },
-              ]}
-              error={data.results.instagram.error}
-              link="https://www.instagram.com/anainimaladay/"
-            />
-
-            {/* GitHub Card */}
-            <ServiceCard
-              title="Kingdom Hearts Custom Music"
-              icon="🎮"
-              status={data.results.github.success}
-              data={[
-                {
-                  label: "Latest Version",
-                  value: data.results.github.version || "N/A",
-                },
-                {
-                  label: "Release Date",
-                  value: data.results.github.releaseDate
-                    ? new Date(
-                        data.results.github.releaseDate
-                      ).toLocaleDateString()
-                    : "N/A",
-                },
-                {
-                  label: "Downloads",
-                  value: data.results.github.downloads?.toString() || "N/A",
-                },
-              ]}
-              error={data.results.github.error}
-              link="https://github.com/jmtdev0/KingdomHeartsCustomMusic"
-            />
-
-            {/* Extension Cards */}
-            {data.results.extensions.map((ext) => (
-              <ServiceCard
-                key={ext.extensionId}
-                title={ext.name}
-                icon="🧩"
-                status={ext.success}
-                data={[
-                  {
-                    label: "Available",
-                    value: ext.available ? "✓ Yes" : "✗ No",
-                    color: ext.available ? "text-green-600" : "text-red-600",
-                  },
-                  {
-                    label: "Functional Test",
-                    value: ext.functionalTest ? "✓ Passed" : "○ Skipped",
-                    color: ext.functionalTest
-                      ? "text-green-600"
-                      : "text-slate-400",
-                  },
-                ]}
-                error={ext.error}
-                link={`https://chromewebstore.google.com/detail/${ext.extensionId}`}
-              />
-            ))}
           </div>
         )}
 

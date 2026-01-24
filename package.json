@@ -1,15 +1,20 @@
 {
-  "name": "dashboard2-temp",
+  "name": "app-health-dashboard",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:scraper": "tsx scripts/test-scraper.ts"
   },
   "dependencies": {
+    "@netlify/functions": "^5.1.2",
+    "axios": "^1.13.2",
+    "cheerio": "^1.1.2",
     "next": "16.1.2",
+    "puppeteer": "^24.35.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -22,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.2",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

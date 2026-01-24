@@ -1,3 +1,33 @@
+# Application Health Dashboard
+
+Dashboard web para monitorizar el estado de aplicaciones y servicios mediante scraping y APIs.
+
+## Características
+
+- ✅ **Scraping con Puppeteer** para YouTube, Twitter/X, Instagram
+- ✅ **APIs directas** para GitHub y precios de criptomonedas
+- ✅ **Testing funcional de extensiones Chrome** con código fuente
+- ✅ **Netlify Scheduled Functions** ejecuta tests diarios automáticamente
+- ✅ **Refresh manual** con botón bajo demanda (rate-limited 5 min)
+- ✅ **Dashboard responsive** con indicadores de estado en tiempo real
+
+## Servicios Monitorizados
+
+### Redes Sociales
+- **YouTube** (@jmtdev) - Fecha del último video
+- **Twitter/X** (@windyBotES) - Último tweet + total de tweets
+- **Instagram** (@anainimaladay) - Fecha del último post
+
+### GitHub
+- **Kingdom Hearts Custom Music** - Versión, fecha, descargas de última release
+
+### Criptomonedas
+- **Bitcoin (BTC)** - Precio en EUR + cambio 24h
+- **Solana (SOL)** - Precio en EUR + cambio 24h
+
+### Chrome Extensions
+- **YouTube Only First Video** - Disponibilidad + test funcional
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
