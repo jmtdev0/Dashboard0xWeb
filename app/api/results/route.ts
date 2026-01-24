@@ -10,7 +10,21 @@ export async function GET() {
     try {
       const data = await fs.readFile(dataPath, "utf-8");
       const parsed = JSON.parse(data);
-      return NextResponse.json(parsed);
+
+      // Remove crypto data from public API response
+      const publicData = {
+        timestamp: parsed.timestamp,
+        results: {
+          youtube: parsed.results.youtube,
+          twitter: parsed.results.twitter,
+          instagram: parsed.results.instagram,
+          github: parsed.results.github,
+          extensions: parsed.results.extensions,
+          // crypto: intentionally excluded from public API
+        },
+      };
+
+      return NextResponse.json(publicData);
     } catch (error) {
       // No data yet
       return NextResponse.json({

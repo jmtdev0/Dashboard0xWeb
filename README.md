@@ -28,6 +28,57 @@ Dashboard web para monitorizar el estado de aplicaciones y servicios mediante sc
 ### Chrome Extensions
 - **YouTube Only First Video** - Disponibilidad + test funcional
 
+## Sección Privada Protegida
+
+La aplicación incluye una **sección privada protegida con password** para datos sensibles (criptomonedas). Los datos de cripto NO están disponibles en la API pública.
+
+### Configuración Inicial
+
+1. **Genera el hash de tu password**:
+   ```bash
+   npm run hash-password "tu-password-seguro"
+   ```
+
+2. **Crea el archivo `.env.local`** en la raíz del proyecto:
+   ```env
+   PRIVATE_PASSWORD_HASH=<hash generado en paso 1>
+   PRIVATE_AUTH_SECRET=<string aleatorio 32+ caracteres>
+   ```
+
+   Para generar el secret aleatorio:
+   ```bash
+   # En Linux/Mac:
+   openssl rand -hex 32
+
+   # O usa cualquier generador de strings aleatorios
+   ```
+
+3. **Accede a la sección privada**:
+   - URL: `/private/ge8d9nH$,1xOMk_/`
+   - Introduce la password cuando se te solicite
+   - Token válido por 30 minutos
+   - **Stateless**: Al recargar la página, deberás volver a introducir la password
+
+### Características de Seguridad
+
+- ✅ **Password hasheada** con bcrypt (cost factor 12)
+- ✅ **Validación server-side** - password verificada en backend
+- ✅ **Token criptográfico** aleatorio de 32 bytes
+- ✅ **Sin persistencia** - token solo en memoria, no cookies/localStorage
+- ✅ **Datos aislados** - crypto data excluida de API pública
+- ✅ **HTTPS enforced** por Netlify
+- ✅ **Anti brute-force** con delay de 1 segundo en fallos
+
+### Deployment en Netlify
+
+1. Ve a **Site Settings → Environment Variables**
+2. Añade las variables:
+   - `PRIVATE_PASSWORD_HASH`
+   - `PRIVATE_AUTH_SECRET`
+3. Redeploy el sitio
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
