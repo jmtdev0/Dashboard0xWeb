@@ -1,15 +1,113 @@
-# Application Health Dashboard
+# App Health Dashboard
 
-Dashboard web para monitorizar el estado de aplicaciones y servicios mediante scraping y APIs.
+Dashboard centralizado para monitorear el estado de redes sociales, GitHub, crypto, y extensiones de navegador. Comparte datos automáticamente entre Web y Android usando Netlify Blobs.
+
+## Desarrollo Local
+
+### Prerequisitos
+
+1. **Node.js** (v18 o superior)
+2. **Netlify CLI** (requerido para desarrollo local)
+
+```bash
+# Instalar Netlify CLI globalmente
+npm install -g netlify-cli
+
+# Login a Netlify
+netlify login
+```
+
+### Configuración Inicial
+
+1. **Clonar el repositorio e instalar dependencias**
+   ```bash
+   git clone <repository-url>
+   cd Dashboard2
+   npm install
+   ```
+
+2. **Configurar variables de entorno**
+   ```bash
+   # Copiar el archivo de ejemplo
+   cp .env.example .env.local
+
+   # Generar hash de contraseña para el dashboard privado
+   npm run hash-password "tu-contraseña-segura"
+
+   # Generar secret para tokens
+   # En Windows PowerShell:
+   -join (1..64 | ForEach-Object { '{0:X}' -f (Get-Random -Max 16) })
+   # En Linux/Mac:
+   openssl rand -hex 32
+   ```
+
+3. **Editar `.env.local`** con los valores generados:
+   ```env
+   PRIVATE_PASSWORD_HASH=tu_bcrypt_hash_generado
+   PRIVATE_AUTH_SECRET=tu_secret_random_de_64_caracteres
+   ```
+
+### Ejecutar en Modo Desarrollo
+
+**IMPORTANTE:** Debes usar `netlify dev` en lugar de `npm run dev` cuando trabajes con esta aplicación.
+
+```bash
+# Ejecutar con Netlify CLI (REQUERIDO)
+netlify dev
+```
+
+La aplicación estará disponible en:
+- **http://localhost:8888** (puerto por defecto de Netlify)
+
+### ¿Por qué `netlify dev`?
+
+Esta aplicación usa **Netlify Blobs** para almacenamiento, que requiere configuración de entorno específica de Netlify.
+
+**Con `netlify dev`:**
+- ✅ Netlify Blobs configurado automáticamente
+- ✅ Store local sandboxed (no afecta producción)
+- ✅ Simula el entorno de Netlify exactamente
+- ✅ Netlify Functions disponibles localmente
+- ✅ No requiere configuración manual de tokens
+- ✅ Variables de entorno cargadas automáticamente
+
+**Con `npm run dev` (solo Next.js):**
+- ❌ Error: "The environment has not been configured to use Netlify Blobs"
+- ❌ Netlify Functions no disponibles
+- ❌ Requiere configuración manual compleja de siteID y token
+
+**Conclusión:** Siempre usa `netlify dev` para desarrollo local.
+
+### Comandos Disponibles
+
+```bash
+# Desarrollo (USAR ESTE)
+netlify dev             # Ejecuta con Netlify CLI (recomendado)
+
+# Build y Deploy
+npm run build           # Build de producción
+npm run start           # Ejecuta build de producción localmente
+netlify deploy --prod   # Deploy a producción en Netlify
+
+# Testing y Scripts
+npm run test:scraper              # Probar scraper localmente
+npm run hash-password             # Generar hash de contraseña
+npm run migrate-dashboard-data    # Migrar datos existentes a Netlify Blobs
+
+# Linting
+npm run lint            # Ejecutar ESLint
+```
 
 ## Características
 
 - ✅ **Scraping con Puppeteer** para YouTube, Twitter/X, Instagram
 - ✅ **APIs directas** para GitHub y precios de criptomonedas
 - ✅ **Testing funcional de extensiones Chrome** con código fuente
-- ✅ **Netlify Scheduled Functions** ejecuta tests diarios automáticamente
-- ✅ **Refresh manual** con botón bajo demanda (rate-limited 5 min)
+- ✅ **Netlify Scheduled Functions** ejecuta tests diarios automáticamente (3 AM UTC)
+- ✅ **Refresh manual** con botón bajo demanda
 - ✅ **Dashboard responsive** con indicadores de estado en tiempo real
+- ✅ **Dashboard privado** con autenticación y gestión de TODOs
+- ✅ **Netlify Blobs** para almacenamiento persistente y compartido
 
 ## Servicios Monitorizados
 
@@ -28,90 +126,226 @@ Dashboard web para monitorizar el estado de aplicaciones y servicios mediante sc
 ### Chrome Extensions
 - **YouTube Only First Video** - Disponibilidad + test funcional
 
-## Sección Privada Protegida
+## Estructura del Proyecto
 
-La aplicación incluye una **sección privada protegida con password** para datos sensibles (criptomonedas). Los datos de cripto NO están disponibles en la API pública.
+```
+Dashboard2/
+├── app/                      # Next.js App Router
+│   ├── api/                  # API Routes
+│   │   ├── results/          # Dashboard público
+│   │   ├── private/          # Dashboard privado (autenticado)
+│   │   ├── scrape/           # Trigger manual de scraping
+│   │   └── todos/            # API de TODOs
+│   ├── page.tsx              # Dashboard público
+│   └── private/              # UI del dashboard privado
+├── lib/                      # Librerías compartidas
+│   ├── dashboard-storage.ts  # Almacenamiento del dashboard (Netlify Blobs)
+│   └── todos-storage.ts      # Almacenamiento de TODOs (Netlify Blobs)
+├── netlify/
+│   └── functions/            # Netlify Functions
+│       ├── daily-scraper.ts  # Scheduled function (3 AM UTC)
+│       ├── manual-scraper.ts # Scraper manual
+│       └── get-results.ts    # API pública de resultados
+├── scripts/                  # Scripts de utilidad
+└── public/                   # Archivos estáticos
+```
 
-### Configuración Inicial
+## Arquitectura de Datos
 
-1. **Genera el hash de tu password**:
+La aplicación usa **Netlify Blobs** como almacenamiento centralizado:
+
+### Stores
+
+1. **`dashboard` store**: Datos del dashboard público
+   - YouTube Analytics
+   - Twitter/X Status
+   - Instagram Status
+   - GitHub API Status
+   - Crypto Prices (BTC, SOL)
+   - Extension Testing Results
+   - Timestamp de última actualización
+
+2. **`todos` store**: TODOs del dashboard privado
+   - Lista de tareas
+   - Timestamp de última modificación
+
+### Ventajas de Netlify Blobs
+
+- ✅ Datos persistentes entre deploys
+- ✅ Compartidos automáticamente entre Web y Android
+- ✅ No requiere sistema de archivos en serverless functions
+- ✅ Consistencia fuerte garantizada
+- ✅ Sin costo adicional en free tier
+- ✅ API simple y type-safe
+- ✅ Configuración automática con `netlify dev`
+
+## Dashboard Privado
+
+El dashboard privado requiere autenticación con contraseña y permite gestionar TODOs personales.
+
+### Configuración
+
+1. Generar hash de contraseña:
    ```bash
-   npm run hash-password "tu-password-seguro"
+   npm run hash-password "tu-contraseña-segura"
    ```
 
-2. **Crea el archivo `.env.local`** en la raíz del proyecto:
+2. Copiar el hash generado a `.env.local`:
    ```env
-   PRIVATE_PASSWORD_HASH=<hash generado en paso 1>
-   PRIVATE_AUTH_SECRET=<string aleatorio 32+ caracteres>
+   PRIVATE_PASSWORD_HASH=<hash_generado>
    ```
 
-   Para generar el secret aleatorio:
+3. Generar un secret aleatorio para tokens:
    ```bash
-   # En Linux/Mac:
-   openssl rand -hex 32
+   # Windows PowerShell
+   -join (1..64 | ForEach-Object { '{0:X}' -f (Get-Random -Max 16) })
 
-   # O usa cualquier generador de strings aleatorios
+   # Linux/Mac
+   openssl rand -hex 32
    ```
 
-3. **Accede a la sección privada**:
-   - URL: `/private/ge8d9nH$,1xOMk_/`
-   - Introduce la password cuando se te solicite
-   - Token válido por 30 minutos
-   - **Stateless**: Al recargar la página, deberás volver a introducir la password
+4. Agregar el secret a `.env.local`:
+   ```env
+   PRIVATE_AUTH_SECRET=<secret_generado>
+   ```
+
+### Acceso
+
+- **URL**: `/private`
+- **Autenticación**: Contraseña configurada
+- **Token**: Cookie HTTP-only válida por 30 días
+- **Características**: Ver datos de cripto + gestión de TODOs
 
 ### Características de Seguridad
 
 - ✅ **Password hasheada** con bcrypt (cost factor 12)
 - ✅ **Validación server-side** - password verificada en backend
-- ✅ **Token criptográfico** aleatorio de 32 bytes
-- ✅ **Sin persistencia** - token solo en memoria, no cookies/localStorage
+- ✅ **Cookie HTTP-only** - protegida contra XSS
 - ✅ **Datos aislados** - crypto data excluida de API pública
 - ✅ **HTTPS enforced** por Netlify
 - ✅ **Anti brute-force** con delay de 1 segundo en fallos
 
-### Deployment en Netlify
+## Scraping Automático
 
-1. Ve a **Site Settings → Environment Variables**
-2. Añade las variables:
-   - `PRIVATE_PASSWORD_HASH`
-   - `PRIVATE_AUTH_SECRET`
-3. Redeploy el sitio
+La aplicación ejecuta scraping automático diariamente a las **3 AM UTC** usando Netlify Scheduled Functions.
 
----
+### Trigger Manual
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Puedes ejecutar el scraping manualmente:
 
-## Getting Started
+1. **Desde la UI**: Botón "Refresh" en el dashboard
+2. **Desde la API**:
+   ```bash
+   curl -X POST http://localhost:8888/.netlify/functions/manual-scraper
+   ```
 
-First, run the development server:
+3. **En producción**:
+   ```bash
+   curl -X POST https://tu-site.netlify.app/.netlify/functions/manual-scraper
+   ```
+
+## Deployment
+
+Ver [DEPLOYMENT.md](./DEPLOYMENT.md) para instrucciones detalladas de deployment en Netlify.
+
+### Deploy Rápido
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Deploy a producción
+netlify deploy --prod
+
+# Deploy a preview (staging)
+netlify deploy
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Troubleshooting
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Error: "The environment has not been configured to use Netlify Blobs"
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Causa:** Estás ejecutando `next dev` directamente en lugar de `netlify dev`.
 
-## Learn More
+**Solución:** Usar `netlify dev` en su lugar.
 
-To learn more about Next.js, take a look at the following resources:
+### Puerto 8888 ya en uso
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Especificar un puerto diferente
+netlify dev --port 8889
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Netlify CLI no encontrado
 
-## Deploy on Vercel
+```bash
+# Instalar globalmente
+npm install -g netlify-cli
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Verificar instalación
+netlify --version
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### No aparecen datos en el dashboard
+
+1. Verificar que el scraper se haya ejecutado:
+   ```bash
+   netlify functions:log daily-scraper
+   ```
+
+2. Ejecutar scraper manualmente:
+   ```bash
+   npm run test:scraper
+   ```
+
+3. Verificar logs en Netlify dashboard
+
+### Errores de autenticación en dashboard privado
+
+1. Verificar que `.env.local` tiene las variables correctas
+2. Re-generar el hash de contraseña
+3. Limpiar cookies del navegador
+4. Restart del servidor (`netlify dev`)
+
+## API Endpoints
+
+### Público
+
+- `GET /api/results` - Obtener datos del dashboard
+- `POST /api/scrape` - Trigger manual de scraping
+
+### Privado (requiere autenticación)
+
+- `POST /api/private/login` - Login con contraseña
+- `POST /api/private/logout` - Logout
+- `GET /api/private/data` - Obtener datos privados (cripto)
+- `GET /api/todos` - Obtener TODOs
+- `POST /api/todos` - Crear TODO
+- `PUT /api/todos/:id` - Actualizar TODO
+- `DELETE /api/todos/:id` - Eliminar TODO
+
+## Tecnologías
+
+- **Framework**: Next.js 16 (App Router)
+- **Styling**: Tailwind CSS 4
+- **Authentication**: bcryptjs + HTTP-only cookies
+- **Storage**: Netlify Blobs
+- **Functions**: Netlify Functions + Scheduled Functions
+- **Scraping**: Puppeteer + chrome-aws-lambda
+- **Deployment**: Netlify
+
+## Limitaciones Conocidas
+
+- **Function Timeout**: 10s en free tier, 26s en Pro
+- **Memory**: 1024 MB por function
+- **Puppeteer**: Puede fallar con sitios muy pesados
+- **Scheduled Functions**: Solo en producción (local usa triggers manuales)
+
+## Contribuir
+
+1. Fork del repositorio
+2. Crear feature branch (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit de cambios (`git commit -m 'feat: Agregar nueva funcionalidad'`)
+4. Push a branch (`git push origin feature/nueva-funcionalidad`)
+5. Crear Pull Request
+
+## Licencia
+
+MIT

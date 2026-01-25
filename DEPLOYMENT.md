@@ -1,5 +1,21 @@
 # Deployment Instructions
 
+> **IMPORTANTE - Desarrollo Local:**
+>
+> Para desarrollo local, debes usar **`netlify dev`** en lugar de `npm run dev`.
+>
+> Esta aplicación usa **Netlify Blobs** para almacenamiento, que requiere el entorno de Netlify para funcionar correctamente. Con `netlify dev` obtienes:
+> - ✅ Netlify Blobs configurado automáticamente (sin configuración manual)
+> - ✅ Store local sandboxed (no afecta producción)
+> - ✅ Netlify Functions disponibles localmente
+> - ✅ Variables de entorno cargadas automáticamente
+>
+> **Comando:** `netlify dev`
+>
+> Ver [README.md](./README.md) para instrucciones completas de desarrollo local.
+
+---
+
 ## Netlify Setup
 
 ### 1. Install Netlify CLI
@@ -40,12 +56,18 @@ netlify deploy --prod
 
 ## Testing Local
 
+### Migrar datos existentes (si aplica)
+Si tienes datos previos en `data/lastRun.json`, migra a Netlify Blobs:
+```bash
+npm run migrate-dashboard-data
+```
+
 ### Probar el scraper localmente
 ```bash
 npm run test:scraper
 ```
 
-Esto ejecutará todos los tests y guardará los resultados en `data/lastRun.json`.
+**NOTA:** Los datos ahora se guardan en Netlify Blobs (almacenamiento centralizado), NO en archivos locales. Esto permite compartir datos entre Web y Android automáticamente.
 
 ### Ejecutar dashboard en dev mode
 ```bash
@@ -152,10 +174,59 @@ Si necesitas más:
 - Longer timeouts (26s para background functions)
 - Scheduled functions support
 
+## Netlify Blobs Storage
+
+### Arquitectura de Datos
+La aplicación usa **Netlify Blobs** como almacenamiento centralizado:
+
+- **Dashboard data** (`dashboard` store): Datos de YouTube, Twitter, Instagram, GitHub, crypto, extensiones
+- **TODOs** (`todos` store): Lista de tareas del usuario privado
+- **Strong consistency**: Los cambios son visibles inmediatamente
+- **Shared entre Web y Android**: Ambas plataformas leen/escriben del mismo store
+
+### Ventajas sobre archivos locales
+✅ Datos persistentes entre deploys
+✅ Compartidos automáticamente entre Web y Android
+✅ No requiere sistema de archivos en serverless functions
+✅ Consistencia fuerte garantizada
+✅ Escalable y sin costo adicional en free tier
+
+### Estructura de Stores
+
+```
+dashboard (store)
+└── dashboard-data (blob key)
+    └── { timestamp, results: { youtube, twitter, instagram, github, crypto, extensions } }
+
+todos (store)
+└── todos-data (blob key)
+    └── { todos: [...], lastModified }
+```
+
+### Acceso programático
+```typescript
+// Leer datos del dashboard
+import { getDashboardData } from '@/lib/dashboard-storage';
+const data = await getDashboardData();
+
+// Guardar datos del dashboard
+import { saveDashboardData } from '@/lib/dashboard-storage';
+await saveDashboardData(results);
+
+// Leer TODOs
+import { getAllTodos } from '@/lib/todos-storage';
+const todoData = await getAllTodos();
+
+// Guardar TODOs
+import { saveTodos } from '@/lib/todos-storage';
+await saveTodos(todos);
+```
+
 ## Next Steps
 
 1. Deploy a Netlify
 2. Probar scheduled function
-3. Verificar que los resultados se guardan correctamente
-4. Añadir más extensiones al testing
-5. Considerar migrar de scraping a APIs oficiales para mejor estabilidad
+3. Verificar que los datos se guardan en Netlify Blobs correctamente
+4. Probar endpoints `/api/results` y `/api/todos` desde Android
+5. Añadir más extensiones al testing
+6. Considerar migrar de scraping a APIs oficiales para mejor estabilidad
