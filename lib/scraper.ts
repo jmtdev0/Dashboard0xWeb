@@ -58,7 +58,7 @@ export interface ExtensionResult {
 }
 
 async function getBrowser(): Promise<Browser> {
-  // Use puppeteer's bundled Chromium
+  // Use puppeteer's bundled Chromium 
   // New headless mode is now the default in Puppeteer v22+
   return puppeteer.launch({
     headless: true,
@@ -145,7 +145,7 @@ async function testYouTube(browser: Browser): Promise<YoutubeResult> {
       timeout: 30000,
     });
 
-    // Wait for page to render
+    // Wait for page to render .
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Get page content and look for video info
