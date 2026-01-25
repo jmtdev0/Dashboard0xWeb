@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { runAllTests } from "@/lib/scraper";
-import fs from "fs/promises";
-import path from "path";
+import { saveDashboardData } from "@/lib/dashboard-storage";
 
 // Simple rate limiting (in-memory)
 const lastRunMap = new Map<string, number>();
@@ -11,7 +10,7 @@ export async function POST(request: Request) {
     // Get IP for rate limiting
     const forwarded = request.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0] : "localhost";
-    
+
     const now = Date.now();
     const lastRun = lastRunMap.get(ip);
 
@@ -31,14 +30,8 @@ export async function POST(request: Request) {
     // Run all tests
     const results = await runAllTests();
 
-    // Save results
-    const dataDir = path.join(process.cwd(), "data");
-    await fs.mkdir(dataDir, { recursive: true });
-    await fs.writeFile(
-      path.join(dataDir, "lastRun.json"),
-      JSON.stringify(results, null, 2),
-      "utf-8"
-    );
+    // Save results to Netlify Blobs (shared between Web and Android)
+    await saveDashboardData(results);
 
     return NextResponse.json({
       success: true,

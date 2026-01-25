@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "netlify dev",
+    "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test:scraper": "tsx scripts/test-scraper.ts",
-    "hash-password": "tsx scripts/generate-password-hash.ts"
+    "hash-password": "tsx scripts/generate-password-hash.ts",
+    "migrate-dashboard-data": "tsx scripts/migrate-dashboard-data.ts"
   },
   "dependencies": {
     "@netlify/blobs": "^10.5.0",
