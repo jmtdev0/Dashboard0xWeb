@@ -59,9 +59,9 @@ export interface ExtensionResult {
 
 async function getBrowser(): Promise<Browser> {
   // Use puppeteer's bundled Chromium
-  // Use "new" headless mode which is harder to detect
+  // New headless mode is now the default in Puppeteer v22+
   return puppeteer.launch({
-    headless: "new", // New headless mode (less detectable than true)
+    headless: true,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
