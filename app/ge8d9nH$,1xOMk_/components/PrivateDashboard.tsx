@@ -101,27 +101,6 @@ export default function PrivateDashboard({
 
                 {/* Buttons - Responsive Grid Layout */}
                 <div className="grid grid-cols-2 lg:flex gap-2 lg:gap-3">
-                  {/* TODOs Button - Full width on mobile, col-span-2 */}
-                  <button
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className="col-span-2 lg:col-span-1 px-4 py-3 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center justify-center gap-2 lg:hidden"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                      />
-                    </svg>
-                    <span>TODOs</span>
-                  </button>
-
                   {/* Refresh Button */}
                   <button
                     onClick={handleRefresh}
@@ -278,6 +257,27 @@ export default function PrivateDashboard({
             )}
           </div>
         </div>
+
+        {/* Floating Action Button (FAB) for TODOs - Mobile */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="lg:hidden fixed bottom-6 right-6 w-16 h-16 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white rounded-full shadow-2xl flex items-center justify-center z-30 transition-all transform hover:scale-110 active:scale-95"
+          aria-label="Toggle TODO list"
+        >
+          <svg
+            className="w-7 h-7"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            />
+          </svg>
+        </button>
 
         {/* TODO Sidebar */}
         <TodoSidebar
