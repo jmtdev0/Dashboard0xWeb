@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls -la \"e:\\\\Software\\\\Coding\\\\Dashboard2\\\\app\\\\private\"\" 2>/dev/null || echo \"Directory might not exist yet \")",
-      "Bash(npm install:*)"
-    ]
-  }
-}

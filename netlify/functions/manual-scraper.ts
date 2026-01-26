@@ -1,7 +1,6 @@
 import type { Handler } from "@netlify/functions";
 import { runAllTests } from "../../lib/scraper";
-import fs from "fs/promises";
-import path from "path";
+import { saveDashboardData } from "../../lib/dashboard-storage";
 
 // Rate limiting in-memory (simple approach for demo)
 const lastRunMap = new Map<string, number>();
@@ -50,14 +49,8 @@ export const handler: Handler = async (event) => {
     // Run all tests
     const results = await runAllTests();
 
-    // Save results
-    const dataDir = path.join(process.cwd(), "data");
-    await fs.mkdir(dataDir, { recursive: true });
-    await fs.writeFile(
-      path.join(dataDir, "lastRun.json"),
-      JSON.stringify(results, null, 2),
-      "utf-8"
-    );
+    // Save results to Netlify Blobs (shared between Web and Android)
+    await saveDashboardData(results);
 
     return {
       statusCode: 200,

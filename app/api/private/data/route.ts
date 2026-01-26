@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
 import { validateToken } from "@/lib/auth-utils";
+import { getDashboardData } from "@/lib/dashboard-storage";
 
 export async function GET(request: Request) {
   try {
@@ -25,27 +24,23 @@ export async function GET(request: Request) {
     }
 
     // Token is valid - return private data
-    const dataPath = path.join(process.cwd(), "data", "lastRun.json");
+    const data = await getDashboardData();
 
-    try {
-      const data = await fs.readFile(dataPath, "utf-8");
-      const parsed = JSON.parse(data);
-
-      // Extract only crypto data
-      const privateData = {
-        timestamp: parsed.timestamp,
-        crypto: parsed.results.crypto || null,
-      };
-
-      return NextResponse.json(privateData);
-    } catch (fileError) {
-      // File doesn't exist or can't be read
+    if (!data) {
       return NextResponse.json({
         timestamp: null,
         crypto: null,
         message: "No data available yet. Run scraper first.",
       });
     }
+
+    // Extract only crypto data
+    const privateData = {
+      timestamp: data.timestamp,
+      crypto: data.results.crypto || null,
+    };
+
+    return NextResponse.json(privateData);
   } catch (error) {
     console.error("Private data fetch error:", error);
     return NextResponse.json(

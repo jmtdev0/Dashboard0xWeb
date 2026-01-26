@@ -1,0 +1,47 @@
+name: Auto Merge Claude Branches to Develop
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+
+jobs:
+  merge-to-develop:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge to develop
+        run: |
+          # Get the branch that triggered this workflow
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "Merging $BRANCH_NAME into develop"
+
+          # Create develop branch if it doesn't exist
+          if ! git ls-remote --heads origin develop | grep -q develop; then
+            echo "Creating develop branch"
+            git checkout -b develop
+            git push -u origin develop
+          else
+            echo "Checking out develop branch"
+            git checkout develop
+            git pull origin develop
+          fi
+
+          # Merge the claude/* branch into develop
+          git merge --no-ff origin/$BRANCH_NAME -m "chore: auto-merge $BRANCH_NAME into develop"
+
+          # Push to develop
+          git push origin develop

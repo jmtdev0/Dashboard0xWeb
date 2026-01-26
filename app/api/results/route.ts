@@ -1,38 +1,32 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
+import { getDashboardData } from "@/lib/dashboard-storage";
 
 export async function GET() {
   try {
-    const dataPath = path.join(process.cwd(), "data", "lastRun.json");
+    const data = await getDashboardData();
 
-    // Check if file exists
-    try {
-      const data = await fs.readFile(dataPath, "utf-8");
-      const parsed = JSON.parse(data);
-
-      // Remove crypto data from public API response
-      const publicData = {
-        timestamp: parsed.timestamp,
-        results: {
-          youtube: parsed.results.youtube,
-          twitter: parsed.results.twitter,
-          instagram: parsed.results.instagram,
-          github: parsed.results.github,
-          extensions: parsed.results.extensions,
-          // crypto: intentionally excluded from public API
-        },
-      };
-
-      return NextResponse.json(publicData);
-    } catch (error) {
-      // No data yet
+    if (!data) {
       return NextResponse.json({
         timestamp: null,
         results: null,
         message: "No data available yet. Run scraper first.",
       });
     }
+
+    // Remove crypto data from public API response
+    const publicData = {
+      timestamp: data.timestamp,
+      results: {
+        youtube: data.results.youtube,
+        twitter: data.results.twitter,
+        instagram: data.results.instagram,
+        github: data.results.github,
+        extensions: data.results.extensions,
+        // crypto: intentionally excluded from public API
+      },
+    };
+
+    return NextResponse.json(publicData);
   } catch (error) {
     return NextResponse.json(
       {

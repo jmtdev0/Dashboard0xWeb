@@ -1,6 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import fs from "fs/promises";
-import path from "path";
+import { getDashboardData } from "../../lib/dashboard-storage";
 
 export const handler: Handler = async () => {
   const headers = {
@@ -9,18 +8,9 @@ export const handler: Handler = async () => {
   };
 
   try {
-    const dataPath = path.join(process.cwd(), "data", "lastRun.json");
+    const data = await getDashboardData();
 
-    // Check if file exists
-    try {
-      const data = await fs.readFile(dataPath, "utf-8");
-      return {
-        statusCode: 200,
-        headers,
-        body: data,
-      };
-    } catch (error) {
-      // No data yet
+    if (!data) {
       return {
         statusCode: 200,
         headers,
@@ -31,6 +21,12 @@ export const handler: Handler = async () => {
         }),
       };
     }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(data),
+    };
   } catch (error) {
     return {
       statusCode: 500,
