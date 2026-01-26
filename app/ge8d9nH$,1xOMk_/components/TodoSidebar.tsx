@@ -233,7 +233,7 @@ export default function TodoSidebar({
       <div
         className={`fixed lg:sticky top-0 right-0 h-screen bg-white dark:bg-sky-900/60 backdrop-blur-sm border-l-2 border-sky-200 dark:border-sky-700 z-50 transition-transform duration-300 overflow-y-auto ${
           isOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-        } w-full lg:w-96`}
+        } w-full sm:w-96 lg:w-96`}
       >
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-sky-900/80 backdrop-blur-sm border-b-2 border-sky-200 dark:border-sky-700 p-4">
