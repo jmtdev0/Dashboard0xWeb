@@ -15,43 +15,67 @@ export default function Dashboard() {
   }, []);
 
   const loadData = async () => {
+    console.log("📊 [PUBLIC DASHBOARD] Loading data...");
     try {
       const response = await fetch("/api/results");
+      console.log("📡 [PUBLIC DASHBOARD] Response status:", response.status);
+
       const result = await response.json();
+      console.log("📦 [PUBLIC DASHBOARD] Data received:", {
+        hasResults: !!result.results,
+        timestamp: result.timestamp,
+        message: result.message,
+      });
 
       if (result.results) {
         setData(result);
         setLastUpdate(result.timestamp);
         setError(null);
+        console.log("✅ [PUBLIC DASHBOARD] Data loaded successfully");
       } else {
+        console.log("⚠️ [PUBLIC DASHBOARD] No results in response");
         setError(result.message || "No data available yet");
       }
     } catch (err) {
+      console.error("❌ [PUBLIC DASHBOARD] Failed to load data:", err);
       setError("Failed to load data");
-      console.error(err);
     }
   };
 
   const handleRefresh = async () => {
+    console.log("🔄 [PUBLIC DASHBOARD] Manual refresh triggered");
     setLoading(true);
     setError(null);
 
     try {
+      console.log("🚀 [PUBLIC DASHBOARD] Calling scrape API...");
       const response = await fetch("/api/scrape", {
         method: "POST",
       });
 
+      console.log("📡 [PUBLIC DASHBOARD] Scrape response:", {
+        ok: response.ok,
+        status: response.status,
+      });
+
       const result = await response.json();
+      console.log("📦 [PUBLIC DASHBOARD] Scrape result:", {
+        success: result.success,
+        timestamp: result.timestamp,
+        hasResults: !!result.results,
+      });
 
       if (response.ok) {
         setData(result);
         setLastUpdate(result.timestamp);
+        console.log("✅ [PUBLIC DASHBOARD] Refresh successful");
       } else {
+        console.log("❌ [PUBLIC DASHBOARD] Scrape failed:", result.error);
         setError(result.error || "Failed to refresh data");
       }
     } catch (err) {
+      console.error("❌ [PUBLIC DASHBOARD] Refresh error:", err);
       setError("Failed to refresh data");
-      console.error(err);
     } finally {
       setLoading(false);
     }

@@ -2,10 +2,16 @@ import { NextResponse } from "next/server";
 import { getDashboardData } from "@/lib/dashboard-storage";
 
 export async function GET() {
+  console.log("📊 [RESULTS] Fetching public dashboard data");
   try {
     const data = await getDashboardData();
+    console.log("📦 [RESULTS] Data retrieved:", {
+      hasData: !!data,
+      timestamp: data?.timestamp,
+    });
 
     if (!data) {
+      console.log("⚠️ [RESULTS] No data available");
       return NextResponse.json({
         timestamp: null,
         results: null,
@@ -26,8 +32,10 @@ export async function GET() {
       },
     };
 
+    console.log("✅ [RESULTS] Returning public data");
     return NextResponse.json(publicData);
   } catch (error) {
+    console.error("❌ [RESULTS] Error fetching data:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",

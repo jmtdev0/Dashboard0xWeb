@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 interface LoginFormProps {
-  onSuccess: (token: string) => void;
+  onSuccess: (token: string, expiresAt: number) => void;
 }
 
 export default function LoginForm({ onSuccess }: LoginFormProps) {
@@ -27,7 +27,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       const result = await response.json();
 
       if (result.success && result.token) {
-        onSuccess(result.token);
+        onSuccess(result.token, result.expiresAt);
         setPassword(""); // Clear password from memory
       } else {
         setError(result.error || "Invalid password");
@@ -177,7 +177,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-500 dark:text-sky-300">
-          Session expires after 30 minutes • No data stored locally
+          Web: 24h session cookie • Mobile: 30 days storage
         </p>
       </div>
     </div>

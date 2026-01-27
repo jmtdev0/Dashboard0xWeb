@@ -32,55 +32,83 @@ export default function PrivateDashboard({
   }, [token]);
 
   const loadData = async () => {
+    console.log("📊 [DASHBOARD] Loading private data...");
     try {
+      const headers: HeadersInit = {};
+
+      // Use Bearer token if it's not cookie-auth
+      if (token && token !== "cookie-auth") {
+        headers["Authorization"] = `Bearer ${token}`;
+        console.log("🔑 [DASHBOARD] Using Bearer token");
+      } else {
+        console.log("🍪 [DASHBOARD] Using cookie authentication");
+      }
+
       const response = await fetch("/api/private/data", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: "include", // Include cookies
       });
+
+      console.log("📡 [DASHBOARD] Response status:", response.status);
 
       if (response.status === 401) {
         // Token expired or invalid
+        console.log("❌ [DASHBOARD] Unauthorized - session expired");
         setError("Session expired. Redirecting to login...");
         setTimeout(() => onLogout(), 2000);
         return;
       }
 
       const result = await response.json();
+      console.log("📦 [DASHBOARD] Data received:", {
+        hasData: !!result,
+        hasCrypto: !!result.crypto,
+        timestamp: result.timestamp,
+      });
 
       if (result.crypto) {
         setData(result);
         setError(null);
+        console.log("✅ [DASHBOARD] Data loaded successfully");
       } else {
+        console.log("⚠️ [DASHBOARD] No crypto data available");
         setError(result.message || "No data available yet");
       }
     } catch (err) {
+      console.error("❌ [DASHBOARD] Failed to load data:", err);
       setError("Failed to load data");
-      console.error(err);
     }
   };
 
   const handleRefresh = async () => {
+    console.log("🔄 [DASHBOARD] Manual refresh triggered");
     setLoading(true);
     setError(null);
 
     try {
       // Trigger scrape
+      console.log("🚀 [DASHBOARD] Calling scrape API...");
       const response = await fetch("/api/scrape", {
         method: "POST",
       });
 
       const result = await response.json();
+      console.log("📡 [DASHBOARD] Scrape response:", {
+        ok: response.ok,
+        status: response.status,
+      });
 
       if (response.ok) {
+        console.log("✅ [DASHBOARD] Scrape successful, reloading data");
         // Reload private data after scrape completes
         await loadData();
       } else {
+        console.log("❌ [DASHBOARD] Scrape failed:", result.error);
         setError(result.error || "Failed to refresh data");
       }
     } catch (err) {
+      console.error("❌ [DASHBOARD] Refresh error:", err);
       setError("Failed to refresh data");
-      console.error(err);
     } finally {
       setLoading(false);
     }
