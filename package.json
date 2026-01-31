@@ -9,6 +9,10 @@
     "start": "next start",
     "lint": "eslint",
     "test:scraper": "tsx scripts/test-scraper.ts",
+    "test:e2e": "npx playwright test",
+    "test:e2e:local": "npx playwright test --project=local",
+    "test:e2e:netlify": "npx playwright test --project=netlify",
+    "test:e2e:ui": "npx playwright test --ui",
     "hash-password": "tsx scripts/generate-password-hash.ts",
     "migrate-dashboard-data": "tsx scripts/migrate-dashboard-data.ts"
   },
@@ -24,12 +28,14 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.2",
     "tailwindcss": "^4",

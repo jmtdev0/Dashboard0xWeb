@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.test.example
 
 # data directory (contains scraping results)
 /data/
@@ -51,3 +52,8 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

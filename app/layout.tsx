@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// Version tracking - uses commit SHA in production, build timestamp as fallback
+const APP_VERSION = process.env.COMMIT_REF || 
+                    process.env.VERCEL_GIT_COMMIT_SHA || 
+                    `build-${Date.now()}`;
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -24,6 +29,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta name="app-version" content={APP_VERSION} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
