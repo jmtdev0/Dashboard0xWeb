@@ -1,7 +1,29 @@
 import { getStore } from "@netlify/blobs";
 import { TestResult } from "./scraper";
+import { promises as fs } from "fs";
+import path from "path";
 
 const BLOB_KEY = "dashboard-data";
+const LOCAL_DATA_DIR = path.join(process.cwd(), ".local-data");
+const LOCAL_DASHBOARD_FILE = path.join(LOCAL_DATA_DIR, "dashboard-data.json");
+
+/**
+ * Check if we're running in local development (no Netlify Blobs available)
+ */
+function isLocalDevelopment(): boolean {
+  return !process.env.NETLIFY && process.env.NODE_ENV !== "production";
+}
+
+/**
+ * Ensure local data directory exists
+ */
+async function ensureLocalDataDir(): Promise<void> {
+  try {
+    await fs.mkdir(LOCAL_DATA_DIR, { recursive: true });
+  } catch (error) {
+    console.error("Failed to create local data directory:", error);
+  }
+}
 
 /**
  * Get Netlify Blobs store for dashboard data with strong consistency
@@ -15,11 +37,34 @@ function getDashboardStore() {
 }
 
 /**
- * Fetch dashboard data from Netlify Blobs
+ * Fetch dashboard data from Netlify Blobs or local file system
  * Returns null if no data exists
  */
 export async function getDashboardData(): Promise<TestResult | null> {
-  console.log("📦 [STORAGE] Fetching data from Netlify Blobs...");
+  console.log("📦 [STORAGE] Fetching data...");
+
+  // Use local file system in development
+  if (isLocalDevelopment()) {
+    console.log("🏠 [STORAGE] Using local file system (development mode)");
+    try {
+      const data = await fs.readFile(LOCAL_DASHBOARD_FILE, "utf-8");
+      const parsed = JSON.parse(data) as TestResult;
+      console.log("✅ [STORAGE] Data loaded from local file:", {
+        timestamp: parsed.timestamp,
+      });
+      return parsed;
+    } catch (error: any) {
+      if (error.code === "ENOENT") {
+        console.log("⚠️ [STORAGE] No local data file found");
+        return null;
+      }
+      console.error("❌ [STORAGE] Failed to read local file:", error);
+      return null;
+    }
+  }
+
+  // Use Netlify Blobs in production
+  console.log("☁️ [STORAGE] Using Netlify Blobs (production mode)");
   try {
     const store = getDashboardStore();
     console.log("🔗 [STORAGE] Store connected:", { name: "dashboard", key: BLOB_KEY });
@@ -44,17 +89,37 @@ export async function getDashboardData(): Promise<TestResult | null> {
 }
 
 /**
- * Save dashboard data to Netlify Blobs
+ * Save dashboard data to Netlify Blobs or local file system
  * Uses strong consistency for immediate visibility
  */
 export async function saveDashboardData(data: TestResult): Promise<void> {
-  console.log("💾 [STORAGE] Saving data to Netlify Blobs...");
+  console.log("💾 [STORAGE] Saving data...");
   console.log("📊 [STORAGE] Data to save:", {
     timestamp: data.timestamp,
     hasResults: !!data.results,
     hasCrypto: !!data.results?.crypto,
   });
 
+  // Use local file system in development
+  if (isLocalDevelopment()) {
+    console.log("🏠 [STORAGE] Using local file system (development mode)");
+    try {
+      await ensureLocalDataDir();
+      await fs.writeFile(
+        LOCAL_DASHBOARD_FILE,
+        JSON.stringify(data, null, 2),
+        "utf-8"
+      );
+      console.log("✅ [STORAGE] Data saved to local file:", LOCAL_DASHBOARD_FILE);
+      return;
+    } catch (error) {
+      console.error("❌ [STORAGE] Failed to save to local file:", error);
+      throw error;
+    }
+  }
+
+  // Use Netlify Blobs in production
+  console.log("☁️ [STORAGE] Using Netlify Blobs (production mode)");
   try {
     const store = getDashboardStore();
     console.log("🔗 [STORAGE] Store connected");

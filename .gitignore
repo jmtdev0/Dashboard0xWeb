@@ -36,6 +36,9 @@ yarn-error.log*
 # data directory (contains scraping results)
 /data/
 
+# local development data (fallback storage)
+/.local-data/
+
 # vercel
 .vercel
 

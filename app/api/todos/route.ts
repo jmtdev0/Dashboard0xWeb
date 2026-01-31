@@ -4,18 +4,44 @@ import { getAllTodos, saveTodos, generateTodoId } from "@/lib/todos-storage";
 import { Todo } from "@/lib/types/todo";
 
 /**
- * Extract and validate token from Authorization header
+ * Extract and validate token from Authorization header or cookies
  * Pattern matches existing protected routes
  */
 function validateRequest(request: Request): boolean {
+  console.log("🔐 [TODOS] Validating request...");
+
+  // Try to get token from Authorization header first
   const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "");
+  let token = authHeader?.replace("Bearer ", "");
+
+  // If no bearer token, try to get from cookies
+  if (!token) {
+    const cookieHeader = request.headers.get("cookie");
+    if (cookieHeader) {
+      const cookies = Object.fromEntries(
+        cookieHeader.split("; ").map(c => {
+          const [key, ...v] = c.split("=");
+          return [key, v.join("=")];
+        })
+      );
+      token = cookies["auth_token"];
+      if (token) {
+        console.log("🍪 [TODOS] Using token from cookie");
+      }
+    }
+  } else {
+    console.log("🔑 [TODOS] Using Bearer token");
+  }
 
   if (!token) {
+    console.log("⚠️ [TODOS] No token provided");
     return false;
   }
 
-  return validateToken(token);
+  const isValid = validateToken(token);
+  console.log("✓ [TODOS] Token valid:", isValid);
+
+  return isValid;
 }
 
 /**
@@ -23,18 +49,22 @@ function validateRequest(request: Request): boolean {
  * Requires valid Authorization token
  */
 export async function GET(request: Request) {
+  console.log("📋 [TODOS] GET request received");
   try {
     if (!validateRequest(request)) {
+      console.log("❌ [TODOS] Unauthorized GET request");
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }
       );
     }
 
+    console.log("📦 [TODOS] Fetching all todos...");
     const data = await getAllTodos();
+    console.log("✅ [TODOS] Todos fetched successfully:", data.todos.length, "items");
     return NextResponse.json(data);
   } catch (error) {
-    console.error("GET /api/todos error:", error);
+    console.error("❌ [TODOS] GET error:", error);
     return NextResponse.json(
       { error: "Failed to fetch todos" },
       { status: 500 }
@@ -48,8 +78,10 @@ export async function GET(request: Request) {
  * Requires valid Authorization token
  */
 export async function POST(request: Request) {
+  console.log("➕ [TODOS] POST request received");
   try {
     if (!validateRequest(request)) {
+      console.log("❌ [TODOS] Unauthorized POST request");
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }

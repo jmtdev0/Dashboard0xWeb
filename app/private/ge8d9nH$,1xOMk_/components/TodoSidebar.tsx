@@ -29,25 +29,39 @@ export default function TodoSidebar({
   }, [token]);
 
   const loadTodos = async () => {
+    console.log("📋 [TODO SIDEBAR] Loading todos...");
     try {
       setLoading(true);
+      const headers: HeadersInit = {};
+
+      // Use Bearer token if it's not cookie-auth
+      if (token && token !== "cookie-auth") {
+        headers["Authorization"] = `Bearer ${token}`;
+        console.log("🔑 [TODO SIDEBAR] Using Bearer token");
+      } else {
+        console.log("🍪 [TODO SIDEBAR] Using cookie authentication");
+      }
+
       const response = await fetch("/api/todos", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: "include", // Include cookies
       });
 
+      console.log("📡 [TODO SIDEBAR] Response status:", response.status);
+
       if (response.status === 401) {
+        console.log("❌ [TODO SIDEBAR] Unauthorized");
         setError("Session expired");
         return;
       }
 
       const data = await response.json();
+      console.log("✅ [TODO SIDEBAR] Todos loaded:", data.todos?.length || 0, "items");
       setTodos(data.todos || []);
       setError(null);
     } catch (err) {
+      console.error("❌ [TODO SIDEBAR] Failed to load todos:", err);
       setError("Failed to load todos");
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -58,29 +72,40 @@ export default function TodoSidebar({
 
     if (!newTodoText.trim()) return;
 
+    console.log("➕ [TODO SIDEBAR] Creating new todo");
+
     try {
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      // Use Bearer token if it's not cookie-auth
+      if (token && token !== "cookie-auth") {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("/api/todos", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers,
+        credentials: "include", // Include cookies
         body: JSON.stringify({ text: newTodoText }),
       });
 
       if (!response.ok) {
         const error = await response.json();
+        console.log("❌ [TODO SIDEBAR] Failed to create:", error.error);
         setError(error.error || "Failed to create todo");
         return;
       }
 
       const newTodo = await response.json();
+      console.log("✅ [TODO SIDEBAR] Todo created:", newTodo.id);
       setTodos([...todos, newTodo]);
       setNewTodoText("");
       setError(null);
     } catch (err) {
+      console.error("❌ [TODO SIDEBAR] Create error:", err);
       setError("Failed to create todo");
-      console.error(err);
     }
   };
 
@@ -98,12 +123,19 @@ export default function TodoSidebar({
     setTodos(optimisticTodos);
 
     try {
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      // Use Bearer token if it's not cookie-auth
+      if (token && token !== "cookie-auth") {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("/api/todos", {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers,
+        credentials: "include", // Include cookies
         body: JSON.stringify({
           id: todo.id,
           completed: !todo.completed,
@@ -135,12 +167,19 @@ export default function TodoSidebar({
     }
 
     try {
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      // Use Bearer token if it's not cookie-auth
+      if (token && token !== "cookie-auth") {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("/api/todos", {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers,
+        credentials: "include", // Include cookies
         body: JSON.stringify({
           id: todo.id,
           text: editText,
@@ -175,12 +214,19 @@ export default function TodoSidebar({
     setTodos(optimisticTodos);
 
     try {
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      // Use Bearer token if it's not cookie-auth
+      if (token && token !== "cookie-auth") {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("/api/todos", {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers,
+        credentials: "include", // Include cookies
         body: JSON.stringify({ id: todo.id }),
       });
 
