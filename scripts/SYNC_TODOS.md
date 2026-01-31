@@ -1,50 +1,76 @@
-# Sync TODOs from Production to Local
+# Netlify Blobs Storage Configuration
 
-Este script sincroniza los TODOs desde el storage de producción de Netlify al sandbox local.
+## Resumen
 
-## Uso Rápido
+Este proyecto usa **Netlify Blobs** para almacenar TODOs. Por defecto:
 
-```bash
-npm run sync-todos
+- **Producción (Netlify)**: Usa Netlify Blobs de producción
+- **Local (`netlify dev`)**: Puede configurarse para usar:
+  - **Opción A**: Sandbox local independiente (por defecto, seguro pero requiere sync)
+  - **Opción B**: Storage de producción directamente (configurado actualmente)
+
+## Configuración Actual: Acceso Directo a Producción ⚡
+
+El entorno local está configurado para acceder **directamente** al blob storage de producción. Esto significa:
+
+✅ **Ventajas:**
+- TODOs en local son exactamente los mismos que en producción
+- No necesitas script de sync
+- Cambios en local se reflejan inmediatamente en producción
+
+⚠️ **Importante:**
+- **Al crear/modificar/borrar TODOs en local, estás modificando PRODUCCIÓN**
+- No hay separación entre entornos
+- Ten cuidado al borrar datos
+
+### Variables de Entorno (`.env.local`)
+
+```env
+# Netlify Blobs configuration for local development
+NETLIFY_BLOBS_SITE_ID=e60958f1-7075-48a3-87d3-bb7111334d5c
+NETLIFY_BLOBS_TOKEN=nfp_... # Personal Access Token de Netlify
 ```
 
-Este comando:
-1. Descarga TODOs de producción
-2. Los copia al sandbox local de Netlify Blobs
-3. Verifica que la sincronización fue exitosa
+## Cambiar a Sandbox Local (Opcional)
 
-**Nota**: Necesitas reiniciar `netlify dev` después de ejecutar este script para ver los cambios.
+Si prefieres trabajar con un sandbox local separado:
 
-## Uso Manual (Alternativa)
+1. **Elimina o comenta** las variables en `.env.local`:
+   ```env
+   # NETLIFY_BLOBS_SITE_ID=...
+   # NETLIFY_BLOBS_TOKEN=...
+   ```
 
-Si prefieres hacerlo manualmente:
+2. **Reinicia** `netlify dev`
 
-```bash
-# 1. Descargar TODOs de producción
-netlify blobs:get todos todos-data > todos-prod.json
+3. **Sincroniza datos** cuando necesites:
+   ```bash
+   npm run sync-todos
+   ```
 
-# 2. Copiar al sandbox local
-# Windows PowerShell:
-$sandboxFile = (Get-ChildItem .netlify\blobs-serve\entries -Recurse -Filter "todos-data" | Select-Object -First 1).FullName
-Copy-Item todos-prod.json $sandboxFile -Force
+## Cómo Funciona
 
-# 3. Reiniciar netlify dev
+El código en `lib/todos-storage.ts` detecta si hay credenciales explícitas:
+
+```typescript
+function getTodoStore() {
+  const config = {
+    name: "todos",
+    consistency: "strong",
+  };
+
+  // Si hay credenciales explícitas, usa producción
+  if (process.env.NETLIFY_BLOBS_SITE_ID && process.env.NETLIFY_BLOBS_TOKEN) {
+    config.siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+    config.token = process.env.NETLIFY_BLOBS_TOKEN;
+  }
+
+  return getStore(config);
+}
 ```
 
-## Nota Importante
+## Scripts npm
 
-- El sandbox local de Netlify Blobs es **independiente** del storage de producción
-- Esto es **por diseño** para proteger los datos de producción
-- Si necesitas trabajar con los datos de producción en local, ejecuta `npm run sync-todos` primero
-- Los cambios en local NO afectan a producción (están completamente separados)
-
-## Ver diferencias
-
-```bash
-# Ver TODOs en producción
-netlify blobs:get todos todos-data | ConvertFrom-Json | Select-Object -ExpandProperty todos | Measure-Object | Select-Object -ExpandProperty Count
-
-# Ver TODOs en local (después de sync)
-# Reinicia netlify dev y prueba el API
-```
+- `npm run dev:netlify` - Ejecuta `netlify dev` (usa la configuración actual)
+- `npm run sync-todos` - Sincroniza TODOs de producción a sandbox local (solo necesario si usas sandbox)
 

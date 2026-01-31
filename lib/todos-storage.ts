@@ -40,12 +40,25 @@ async function ensureLocalDataDir(): Promise<void> {
 /**
  * Get Netlify Blobs store with strong consistency
  * Strong consistency ensures immediate visibility of updates
+ * 
+ * When running locally with netlify dev, we can optionally connect directly
+ * to production blob storage by setting NETLIFY_BLOBS_SITE_ID and NETLIFY_BLOBS_TOKEN
  */
 function getTodoStore() {
-  return getStore({
+  const config: any = {
     name: "todos",
     consistency: "strong", // Critical for immediate updates
-  });
+  };
+
+  // If explicit credentials are provided (for local dev accessing production),
+  // use them instead of default environment detection
+  if (process.env.NETLIFY_BLOBS_SITE_ID && process.env.NETLIFY_BLOBS_TOKEN) {
+    console.log("🔑 [TODO STORAGE] Using explicit Netlify Blobs credentials (production access)");
+    config.siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+    config.token = process.env.NETLIFY_BLOBS_TOKEN;
+  }
+
+  return getStore(config);
 }
 
 /**
