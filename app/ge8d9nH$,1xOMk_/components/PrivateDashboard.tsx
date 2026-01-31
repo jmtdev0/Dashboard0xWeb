@@ -40,9 +40,8 @@ export default function PrivateDashboard({
       });
 
       if (response.status === 401) {
-        // Token expired or invalid
-        setError("Session expired. Redirecting to login...");
-        setTimeout(() => onLogout(), 2000);
+        // Token expired or invalid - show error without logging out
+        setError("Session expired. Please reload the page and login again.");
         return;
       }
 

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:netlify": "netlify dev",
+    "dev:live": "netlify dev --live",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -14,7 +15,8 @@
     "test:e2e:netlify": "npx playwright test --project=netlify",
     "test:e2e:ui": "npx playwright test --ui",
     "hash-password": "tsx scripts/generate-password-hash.ts",
-    "migrate-dashboard-data": "tsx scripts/migrate-dashboard-data.ts"
+    "migrate-dashboard-data": "tsx scripts/migrate-dashboard-data.ts",
+    "sync-todos": "tsx scripts/sync-todos-from-production.ts"
   },
   "dependencies": {
     "@netlify/blobs": "^10.5.0",

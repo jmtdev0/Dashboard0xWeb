@@ -8,10 +8,22 @@ const LOCAL_DATA_DIR = path.join(process.cwd(), ".local-data");
 const LOCAL_TODOS_FILE = path.join(LOCAL_DATA_DIR, "todos-data.json");
 
 /**
- * Check if we're running in local development (no Netlify Blobs available)
+ * Check if we're running in local development WITHOUT Netlify
+ * When running with `netlify dev`, we want to use Netlify Blobs (same as production)
  */
 function isLocalDevelopment(): boolean {
-  return !process.env.NETLIFY && process.env.NODE_ENV !== "production";
+  // Log for debugging
+  console.log("🔍 [TODO STORAGE] Environment check:", {
+    NETLIFY: process.env.NETLIFY,
+    NODE_ENV: process.env.NODE_ENV,
+    NETLIFY_DEV: process.env.NETLIFY_DEV,
+  });
+  
+  // If NETLIFY or NETLIFY_DEV is set, we're running with netlify dev or in production
+  // Only use local file storage when running pure Next.js dev server
+  const useLocalFile = !process.env.NETLIFY && !process.env.NETLIFY_DEV && process.env.NODE_ENV !== "production";
+  console.log("🔍 [TODO STORAGE] Use local file:", useLocalFile);
+  return useLocalFile;
 }
 
 /**

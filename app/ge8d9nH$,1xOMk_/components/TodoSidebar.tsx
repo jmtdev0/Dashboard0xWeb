@@ -38,7 +38,7 @@ export default function TodoSidebar({
       });
 
       if (response.status === 401) {
-        setError("Session expired");
+        setError("Session expired. Please refresh the page to login again.");
         return;
       }
 
