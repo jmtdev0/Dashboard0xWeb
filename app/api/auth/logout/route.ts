@@ -1,30 +1,11 @@
 import { NextResponse } from "next/server";
-import { revokeToken } from "@/lib/auth-utils";
 
 export async function POST(request: Request) {
   console.log("🚪 [LOGOUT] Logout request received");
   try {
-    // Get token from cookie or authorization header
-    const cookieHeader = request.headers.get("cookie");
-    const authHeader = request.headers.get("authorization");
-
-    let token = authHeader?.replace("Bearer ", "");
-
-    if (!token && cookieHeader) {
-      const cookies = Object.fromEntries(
-        cookieHeader.split("; ").map(c => {
-          const [key, ...v] = c.split("=");
-          return [key, v.join("=")];
-        })
-      );
-      token = cookies["auth_token"];
-    }
-
-    // Revoke token if it exists
-    if (token) {
-      revokeToken(token);
-      console.log("🗑️ [LOGOUT] Token revoked");
-    }
+    // Note: With JWT tokens, we can't revoke them server-side (they're stateless)
+    // The logout is handled by clearing the cookie on the client side
+    console.log("🗑️ [LOGOUT] Clearing authentication cookie");
 
     // Create response
     const response = NextResponse.json({

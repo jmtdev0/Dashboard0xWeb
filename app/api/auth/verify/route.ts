@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
-import { storeToken } from "@/lib/auth-utils";
+import { generateToken } from "@/lib/auth-utils";
 
 export async function POST(request: Request) {
   console.log("🔐 [AUTH] Authentication request received");
@@ -43,13 +42,10 @@ export async function POST(request: Request) {
 
     console.log("✅ [AUTH] Password valid, generating token");
 
-    // Generate cryptographically secure random token
-    const token = crypto.randomBytes(32).toString("hex");
+    // Generate JWT token (works in serverless environments)
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days from now
-
-    // Store token in memory
-    storeToken(token, expiresAt);
-    console.log("💾 [AUTH] Token stored with expiry:", new Date(expiresAt).toISOString());
+    const token = generateToken(expiresAt);
+    console.log("💾 [AUTH] JWT token generated with expiry:", new Date(expiresAt).toISOString());
 
     // Create response with cookie for web clients
     const response = NextResponse.json({

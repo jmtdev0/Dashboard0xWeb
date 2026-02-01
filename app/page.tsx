@@ -21,6 +21,7 @@ export default function Dashboard() {
       console.log("📡 [PUBLIC DASHBOARD] Response status:", response.status);
 
       const result = await response.json();
+      console.log("📦 [PUBLIC DASHBOARD] Full response:", JSON.stringify(result, null, 2));
       console.log("📦 [PUBLIC DASHBOARD] Data received:", {
         hasResults: !!result.results,
         timestamp: result.timestamp,
@@ -28,6 +29,38 @@ export default function Dashboard() {
       });
 
       if (result.results) {
+        // Log each service indicator
+        console.log("🎥 [YOUTUBE]", {
+          success: result.results.youtube?.success,
+          lastVideo: result.results.youtube?.lastVideo,
+          error: result.results.youtube?.error,
+        });
+        console.log("🐦 [TWITTER]", {
+          success: result.results.twitter?.success,
+          lastTweet: result.results.twitter?.lastTweet,
+          totalTweets: result.results.twitter?.totalTweets,
+          error: result.results.twitter?.error,
+        });
+        console.log("📷 [INSTAGRAM]", {
+          success: result.results.instagram?.success,
+          lastPost: result.results.instagram?.lastPost,
+          error: result.results.instagram?.error,
+        });
+        console.log("🎮 [GITHUB]", {
+          success: result.results.github?.success,
+          version: result.results.github?.version,
+          downloads: result.results.github?.downloads,
+          error: result.results.github?.error,
+        });
+        console.log("🧩 [EXTENSIONS]", {
+          count: result.results.extensions?.length || 0,
+          extensions: result.results.extensions?.map((ext: any) => ({
+            name: ext.name,
+            available: ext.available,
+            error: ext.error,
+          })),
+        });
+
         setData(result);
         setLastUpdate(result.timestamp);
         setError(null);
