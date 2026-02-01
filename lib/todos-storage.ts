@@ -10,6 +10,9 @@ const LOCAL_TODOS_FILE = path.join(LOCAL_DATA_DIR, "todos-data.json");
 /**
  * Check if we're running in local development WITHOUT Netlify
  * When running with `netlify dev`, we want to use Netlify Blobs (same as production)
+ *
+ * If NETLIFY_BLOBS_SITE_ID and NETLIFY_BLOBS_TOKEN are set, we'll use production blobs
+ * even in local development (useful for working with the same data as production)
  */
 function isLocalDevelopment(): boolean {
   // Log for debugging
@@ -17,10 +20,17 @@ function isLocalDevelopment(): boolean {
     NETLIFY: process.env.NETLIFY,
     NODE_ENV: process.env.NODE_ENV,
     NETLIFY_DEV: process.env.NETLIFY_DEV,
+    HAS_BLOB_CREDENTIALS: !!(process.env.NETLIFY_BLOBS_SITE_ID && process.env.NETLIFY_BLOBS_TOKEN),
   });
-  
+
+  // If production blob credentials are provided, always use Netlify Blobs (even in local dev)
+  if (process.env.NETLIFY_BLOBS_SITE_ID && process.env.NETLIFY_BLOBS_TOKEN) {
+    console.log("🔑 [TODO STORAGE] Production blob credentials detected - using Netlify Blobs");
+    return false; // Use Netlify Blobs, not local files
+  }
+
   // If NETLIFY or NETLIFY_DEV is set, we're running with netlify dev or in production
-  // Only use local file storage when running pure Next.js dev server
+  // Only use local file storage when running pure Next.js dev server without blob credentials
   const useLocalFile = !process.env.NETLIFY && !process.env.NETLIFY_DEV && process.env.NODE_ENV !== "production";
   console.log("🔍 [TODO STORAGE] Use local file:", useLocalFile);
   return useLocalFile;

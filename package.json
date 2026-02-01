@@ -16,7 +16,8 @@
     "test:e2e:ui": "npx playwright test --ui",
     "hash-password": "tsx scripts/generate-password-hash.ts",
     "migrate-dashboard-data": "tsx scripts/migrate-dashboard-data.ts",
-    "sync-todos": "tsx scripts/sync-todos-from-production.ts"
+    "sync-todos": "tsx scripts/sync-todos-from-production.ts",
+    "check-blob-config": "node scripts/check-blob-config.js"
   },
   "dependencies": {
     "@netlify/blobs": "^10.5.0",
