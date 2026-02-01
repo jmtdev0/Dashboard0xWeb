@@ -20,6 +20,7 @@
     "check-blob-config": "node scripts/check-blob-config.js",
     "db:init": "tsx scripts/init-db.ts",
     "db:migrate": "tsx scripts/migrate-blobs-to-db.ts",
+    "db:migrate-todos": "tsx scripts/migrate-todos-to-relational.ts",
     "db:status": "netlify db status"
   },
   "dependencies": {

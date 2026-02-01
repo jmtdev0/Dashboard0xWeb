@@ -77,19 +77,37 @@ export async function getAllTodos(): Promise<TodoListData> {
   console.log("☁️ [TODO STORAGE] Using Netlify DB (production mode)");
   try {
     const sql = neon();
-    const [row] = await sql`
-      SELECT data FROM todos
-      ORDER BY updated_at DESC
-      LIMIT 1
+
+    // Fetch all todos from database
+    const rows = await sql`
+      SELECT
+        id,
+        text,
+        completed,
+        created_at as "createdAt",
+        completed_at as "completedAt"
+      FROM todos
+      ORDER BY created_at DESC
     `;
 
-    if (!row) {
-      console.log("⚠️ [TODO STORAGE] No todos found in database");
-      return { todos: [], lastModified: new Date().toISOString() };
-    }
+    // Map database rows to Todo objects
+    const todos: Todo[] = rows.map((row: any) => ({
+      id: row.id,
+      text: row.text,
+      completed: row.completed,
+      createdAt: row.createdAt,
+      completedAt: row.completedAt,
+    }));
 
-    console.log("✅ [TODO STORAGE] Todos fetched successfully");
-    return row.data as TodoListData;
+    // Get last modified from most recent update
+    const [lastUpdate] = await sql`
+      SELECT MAX(updated_at) as last_modified FROM todos
+    `;
+
+    const lastModified = lastUpdate?.last_modified || new Date().toISOString();
+
+    console.log("✅ [TODO STORAGE] Todos fetched successfully:", todos.length, "items");
+    return { todos, lastModified };
   } catch (error) {
     console.error("❌ [TODO STORAGE] Failed to fetch todos:", error);
     return { todos: [], lastModified: new Date().toISOString() };
@@ -131,11 +149,37 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
   try {
     const sql = neon();
 
-    // Insert new record (trigger will delete old ones automatically)
-    await sql`
-      INSERT INTO todos (data, updated_at)
-      VALUES (${JSON.stringify(data)}, NOW())
-    `;
+    // Get current TODO IDs from the array
+    const todoIds = todos.map((t) => t.id);
+
+    // Upsert each TODO (insert or update if exists)
+    for (const todo of todos) {
+      await sql`
+        INSERT INTO todos (id, text, completed, created_at, completed_at)
+        VALUES (
+          ${todo.id},
+          ${todo.text},
+          ${todo.completed},
+          ${todo.createdAt},
+          ${todo.completedAt}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          text = EXCLUDED.text,
+          completed = EXCLUDED.completed,
+          completed_at = EXCLUDED.completed_at
+      `;
+    }
+
+    // Delete TODOs that are no longer in the array
+    if (todoIds.length > 0) {
+      await sql`
+        DELETE FROM todos
+        WHERE id NOT IN ${sql(todoIds)}
+      `;
+    } else {
+      // If no TODOs in array, delete all
+      await sql`DELETE FROM todos`;
+    }
 
     console.log("✅ [TODO STORAGE] Todos saved successfully to database");
   } catch (error) {
