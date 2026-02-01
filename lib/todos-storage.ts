@@ -8,13 +8,12 @@ const LOCAL_TODOS_FILE = path.join(LOCAL_DATA_DIR, "todos-data.json");
 
 /**
  * Check if we can use Netlify DB
+ * CRITICAL: Only return true if NETLIFY_DATABASE_URL is actually present
  */
 function canUseDatabase(): boolean {
-  return !!(
-    process.env.NETLIFY_DATABASE_URL ||
-    process.env.NETLIFY ||
-    process.env.NETLIFY_DEV
-  );
+  const hasDbUrl = !!process.env.NETLIFY_DATABASE_URL;
+  console.log("🔍 [TODO STORAGE] Can use database:", hasDbUrl);
+  return hasDbUrl;
 }
 
 /**
@@ -30,8 +29,7 @@ function isLocalDevelopment(): boolean {
     HAS_DATABASE_URL: !!process.env.NETLIFY_DATABASE_URL,
   });
 
-  // If NETLIFY or NETLIFY_DEV is set, we're running with netlify dev or in production
-  // Only use local file storage when running pure Next.js dev server without database
+  // Only use local file storage when database is not available
   const useLocalFile = !canUseDatabase() && process.env.NODE_ENV !== "production";
   console.log("🔍 [TODO STORAGE] Use local file:", useLocalFile);
   return useLocalFile;

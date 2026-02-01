@@ -8,20 +8,21 @@ const LOCAL_DASHBOARD_FILE = path.join(LOCAL_DATA_DIR, "dashboard-data.json");
 
 /**
  * Check if we can use Netlify DB (production or Netlify dev environment)
+ * CRITICAL: Only return true if NETLIFY_DATABASE_URL is actually present
  */
 function canUseDatabase(): boolean {
-  return !!(
-    process.env.NETLIFY_DATABASE_URL ||
-    process.env.NETLIFY ||
-    process.env.NETLIFY_DEV
-  );
+  const hasDbUrl = !!process.env.NETLIFY_DATABASE_URL;
+  console.log("🔍 [DASHBOARD STORAGE] Can use database:", hasDbUrl);
+  return hasDbUrl;
 }
 
 /**
  * Check if we're running in local development (no Netlify DB available)
  */
 function isLocalDevelopment(): boolean {
-  return !canUseDatabase() && process.env.NODE_ENV !== "production";
+  const isLocal = !canUseDatabase() && process.env.NODE_ENV !== "production";
+  console.log("🔍 [DASHBOARD STORAGE] Is local development:", isLocal);
+  return isLocal;
 }
 
 /**
