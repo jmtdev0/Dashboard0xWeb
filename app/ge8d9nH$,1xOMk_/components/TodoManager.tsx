@@ -13,7 +13,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [error, setError] = useState<string | null>(null);
   const [newTodoText, setNewTodoText] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("createdAt");
-  const [filter, setFilter] = useState<FilterOption>("all");
+  const [filter, setFilter] = useState<FilterOption>("active");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [isFixingEncoding, setIsFixingEncoding] = useState(false);
@@ -274,8 +274,8 @@ export default function TodoManager({ token }: TodoManagerProps) {
             onChange={(e) => setFilter(e.target.value as FilterOption)}
             className="flex-1 px-4 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
           >
-            <option value="all">All Todos</option>
             <option value="active">Active</option>
+            <option value="all">All Todos</option>
             <option value="completed">Completed</option>
           </select>
           <select
@@ -286,6 +286,27 @@ export default function TodoManager({ token }: TodoManagerProps) {
             <option value="createdAt">Sort by Created Date</option>
             <option value="completedAt">Sort by Completed Date</option>
           </select>
+          <button
+            onClick={loadTodos}
+            disabled={loading}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            title="Refresh todo list"
+          >
+            <svg
+              className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
         </div>
 
         {/* Fix Encoding Button */}
@@ -425,11 +446,11 @@ export default function TodoManager({ token }: TodoManagerProps) {
                     </p>
                     <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-slate-600 dark:text-sky-300">
                       <span>
-                        Created: {new Date(todo.createdAt).toLocaleDateString()}
+                        Created: {new Date(todo.createdAt).toLocaleString()}
                       </span>
                       {todo.completedAt && (
                         <span>
-                          Done: {new Date(todo.completedAt).toLocaleDateString()}
+                          Done: {new Date(todo.completedAt).toLocaleString()}
                         </span>
                       )}
                     </div>

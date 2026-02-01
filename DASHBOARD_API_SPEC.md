@@ -27,11 +27,11 @@
 - **Framework:** Next.js 16.1.2 (App Router)
 - **Runtime:** Node.js
 - **Hosting:** Netlify (serverless)
-- **Base de Datos:** Netlify Blobs (key-value store)
+- **Base de Datos:** Netlify DB (Postgres via Neon)
 - **Autenticación:** Token-based (custom implementation)
 
 ### Arquitectura de Datos (CRÍTICO)
-**TODOS los datos están centralizados en Netlify Blobs:**
+**TODOS los datos están centralizados en Netlify DB:**
 - ✅ La aplicación web y la app Android comparten los **mismos datos**
 - ✅ **TODOs** (`/api/todos`): Lista compartida de tareas
 - ✅ **Estado de aplicaciones** (`/api/results`): YouTube, Twitter, Instagram, GitHub, extensiones
@@ -53,7 +53,7 @@ Production: https://your-dashboard.netlify.app
 
 ### Sincronización de Datos
 
-**IMPORTANTE:** TODOS los datos están almacenados en Netlify Blobs (almacenamiento centralizado en el servidor). Esto significa:
+**IMPORTANTE:** TODOS los datos están almacenados en Netlify DB (almacenamiento centralizado en el servidor). Esto significa:
 
 - **Sincronización automática:** Todos los datos son los mismos en la web y en Android
 - **Fuente única de verdad:** No hay "sincronización" manual - ambas plataformas consultan el mismo backend
@@ -64,14 +64,14 @@ Production: https://your-dashboard.netlify.app
 ```
 Flujo de datos TODOs:
 1. Usuario crea TODO en Android
-2. POST /api/todos → Guarda en Netlify Blobs
-3. Usuario abre la web → GET /api/todos → Lee desde Netlify Blobs
+2. POST /api/todos → Guarda en Netlify DB
+3. Usuario abre la web → GET /api/todos → Lee desde Netlify DB
 4. Resultado: El mismo TODO aparece en ambas plataformas
 
 Flujo de datos del Dashboard:
 1. Scraper actualiza datos (YouTube, Twitter, etc.)
-2. POST /api/scrape → Guarda en Netlify Blobs
-3. Usuario abre Android → GET /api/results → Lee desde Netlify Blobs
+2. POST /api/scrape → Guarda en Netlify DB
+3. Usuario abre Android → GET /api/results → Lee desde Netlify DB
 4. Resultado: Los mismos datos aparecen en Web y Android
 ```
 
