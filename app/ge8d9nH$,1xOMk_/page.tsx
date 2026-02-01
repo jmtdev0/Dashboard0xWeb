@@ -2,23 +2,55 @@
 
 import { useState } from "react";
 import LoginForm from "./components/LoginForm";
-import PrivateDashboard from "./components/PrivateDashboard";
+import SelectionScreen from "./components/SelectionScreen";
+import CryptoView from "./components/CryptoView";
+import TodoView from "./components/TodoView";
+
+type View = "login" | "selection" | "crypto" | "todos";
 
 export default function PrivatePage() {
   const [token, setToken] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<View>("login");
 
   const handleLoginSuccess = (newToken: string) => {
     setToken(newToken);
+    setCurrentView("selection");
   };
 
-  const handleLogout = () => {
-    setToken(null);
+  const handleSelectCrypto = () => {
+    setCurrentView("crypto");
   };
 
-  // Show login form if no token, otherwise show dashboard
-  if (!token) {
+  const handleSelectTodos = () => {
+    setCurrentView("todos");
+  };
+
+  const handleBackToSelection = () => {
+    setCurrentView("selection");
+  };
+
+  // Show login form if no token
+  if (!token || currentView === "login") {
     return <LoginForm onSuccess={handleLoginSuccess} />;
   }
 
-  return <PrivateDashboard token={token} onLogout={handleLogout} />;
+  // Show current view
+  if (currentView === "selection") {
+    return (
+      <SelectionScreen
+        onSelectCrypto={handleSelectCrypto}
+        onSelectTodos={handleSelectTodos}
+      />
+    );
+  }
+
+  if (currentView === "crypto") {
+    return <CryptoView token={token} onBack={handleBackToSelection} />;
+  }
+
+  if (currentView === "todos") {
+    return <TodoView token={token} onBack={handleBackToSelection} />;
+  }
+
+  return null;
 }
