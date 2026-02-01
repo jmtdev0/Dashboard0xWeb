@@ -407,66 +407,121 @@ async function testCryptoPrices(): Promise<CryptoResult> {
 }
 
 async function attemptCryptoFetch(): Promise<CryptoResult> {
+  // Log environment info
+  console.log("🌍 [CRYPTO] Environment:", {
+    isNetlify: !!process.env.NETLIFY,
+    nodeEnv: process.env.NODE_ENV,
+    region: process.env.AWS_REGION || 'unknown',
+  });
+
   // Try CoinGecko first
   try {
     console.log("₿ [CRYPTO] Fetching prices from CoinGecko API...");
+    const startTime = Date.now();
 
-    const response = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=eur&include_24hr_change=true",
-      {
-        headers: {
-          "Accept": "application/json",
-        },
+    // Add timeout and User-Agent to avoid being blocked
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+    try {
+      const response = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=eur&include_24hr_change=true",
+        {
+          headers: {
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; Dashboard0xWeb/1.0; +https://dashboard0x.netlify.app)",
+          },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeoutId);
+
+      const elapsed = Date.now() - startTime;
+      console.log(`₿ [CRYPTO] CoinGecko response received in ${elapsed}ms`);
+      console.log("₿ [CRYPTO] CoinGecko response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("₿ [CRYPTO] CoinGecko API error:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.substring(0, 200),
+          elapsed,
+        });
+        throw new Error(`CoinGecko API error: ${response.status} - ${response.statusText}`);
       }
-    );
 
-    console.log("₿ [CRYPTO] CoinGecko response status:", response.status);
+      const data = await response.json();
+      console.log("₿ [CRYPTO] CoinGecko raw data:", JSON.stringify(data, null, 2));
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("₿ [CRYPTO] CoinGecko API error:", {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText.substring(0, 200),
+      const result = {
+        success: true,
+        btc: {
+          price: data.bitcoin.eur,
+          change24h: data.bitcoin.eur_24h_change,
+        },
+        sol: {
+          price: data.solana.eur,
+          change24h: data.solana.eur_24h_change,
+        },
+      };
+
+      console.log("✅ [CRYPTO] CoinGecko success:", {
+        btcPrice: result.btc.price,
+        btcChange: result.btc.change24h,
+        solPrice: result.sol.price,
+        solChange: result.sol.change24h,
       });
-      throw new Error(`CoinGecko API error: ${response.status}`);
+
+      return result;
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+
+      // Check if it's a timeout error
+      if (fetchError.name === 'AbortError') {
+        console.error("⏱️ [CRYPTO] CoinGecko request timed out after 8 seconds");
+        throw new Error('CoinGecko timeout');
+      }
+
+      throw fetchError;
     }
-
-    const data = await response.json();
-    console.log("₿ [CRYPTO] CoinGecko raw data:", JSON.stringify(data, null, 2));
-
-    const result = {
-      success: true,
-      btc: {
-        price: data.bitcoin.eur,
-        change24h: data.bitcoin.eur_24h_change,
-      },
-      sol: {
-        price: data.solana.eur,
-        change24h: data.solana.eur_24h_change,
-      },
-    };
-
-    console.log("✅ [CRYPTO] CoinGecko success:", {
-      btcPrice: result.btc.price,
-      btcChange: result.btc.change24h,
-      solPrice: result.sol.price,
-      solChange: result.sol.change24h,
-    });
-
-    return result;
   } catch (coinGeckoError) {
     console.warn("⚠️ [CRYPTO] CoinGecko failed, trying CoinCap API fallback...");
-    console.error("₿ [CRYPTO] CoinGecko error details:", coinGeckoError);
+    console.error("₿ [CRYPTO] CoinGecko error details:", {
+      name: (coinGeckoError as Error).name,
+      message: (coinGeckoError as Error).message,
+      error: coinGeckoError,
+    });
 
     // Fallback to CoinCap API
     try {
       console.log("₿ [CRYPTO] Fetching from CoinCap API (fallback)...");
+      const fallbackStartTime = Date.now();
+
+      // Add timeout and User-Agent for CoinCap too
+      const controller2 = new AbortController();
+      const timeoutId2 = setTimeout(() => controller2.abort(), 8000);
 
       const [btcResponse, solResponse] = await Promise.all([
-        fetch("https://api.coincap.io/v2/assets/bitcoin"),
-        fetch("https://api.coincap.io/v2/assets/solana"),
+        fetch("https://api.coincap.io/v2/assets/bitcoin", {
+          headers: {
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; Dashboard0xWeb/1.0; +https://dashboard0x.netlify.app)",
+          },
+          signal: controller2.signal,
+        }),
+        fetch("https://api.coincap.io/v2/assets/solana", {
+          headers: {
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; Dashboard0xWeb/1.0; +https://dashboard0x.netlify.app)",
+          },
+          signal: controller2.signal,
+        }),
       ]);
+
+      clearTimeout(timeoutId2);
+      const fallbackElapsed = Date.now() - fallbackStartTime;
+      console.log(`₿ [CRYPTO] CoinCap responses received in ${fallbackElapsed}ms`);
 
       console.log("₿ [CRYPTO] CoinCap responses:", {
         btcStatus: btcResponse.status,
@@ -518,13 +573,49 @@ async function attemptCryptoFetch(): Promise<CryptoResult> {
       });
 
       return result;
-    } catch (coinCapError) {
+    } catch (coinCapError: any) {
       console.error("❌ [CRYPTO] All crypto APIs failed!");
-      console.error("₿ [CRYPTO] CoinCap error details:", coinCapError);
+
+      // Check if it's a timeout error
+      if (coinCapError.name === 'AbortError') {
+        console.error("⏱️ [CRYPTO] CoinCap request timed out after 8 seconds");
+      }
+
+      console.error("₿ [CRYPTO] CoinCap error details:", {
+        name: coinCapError.name,
+        message: coinCapError.message,
+        error: coinCapError,
+      });
+
+      // Create detailed error message
+      let errorMessage = "Unable to fetch crypto prices";
+
+      if (coinGeckoError instanceof Error && coinCapError instanceof Error) {
+        const isTimeout =
+          coinGeckoError.message.includes('timeout') ||
+          coinGeckoError.name === 'AbortError' ||
+          coinCapError.message.includes('timeout') ||
+          coinCapError.name === 'AbortError';
+
+        if (isTimeout) {
+          errorMessage += " (API timeout - requests taking too long)";
+        } else if (coinGeckoError.message.includes('429') || coinCapError.message.includes('429')) {
+          errorMessage += " (Rate limited - too many requests)";
+        } else {
+          errorMessage += ` (Both APIs failed: ${coinGeckoError.message} / ${coinCapError.message})`;
+        }
+      } else {
+        errorMessage += " (APIs unavailable)";
+      }
+
+      // Add Netlify-specific hint
+      if (process.env.NETLIFY) {
+        errorMessage += " [Netlify environment]";
+      }
 
       const errorResult = {
         success: false,
-        error: "Unable to fetch crypto prices (APIs unavailable)",
+        error: errorMessage,
       };
 
       console.error("₿ [CRYPTO] Returning error result:", errorResult);
