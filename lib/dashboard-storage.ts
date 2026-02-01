@@ -1,17 +1,27 @@
-import { getStore } from "@netlify/blobs";
+import { neon } from "@netlify/neon";
 import { TestResult } from "./scraper";
 import { promises as fs } from "fs";
 import path from "path";
 
-const BLOB_KEY = "dashboard-data";
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".local-data");
 const LOCAL_DASHBOARD_FILE = path.join(LOCAL_DATA_DIR, "dashboard-data.json");
 
 /**
- * Check if we're running in local development (no Netlify Blobs available)
+ * Check if we can use Netlify DB (production or Netlify dev environment)
+ */
+function canUseDatabase(): boolean {
+  return !!(
+    process.env.NETLIFY_DATABASE_URL ||
+    process.env.NETLIFY ||
+    process.env.NETLIFY_DEV
+  );
+}
+
+/**
+ * Check if we're running in local development (no Netlify DB available)
  */
 function isLocalDevelopment(): boolean {
-  return !process.env.NETLIFY && process.env.NODE_ENV !== "production";
+  return !canUseDatabase() && process.env.NODE_ENV !== "production";
 }
 
 /**
@@ -26,18 +36,7 @@ async function ensureLocalDataDir(): Promise<void> {
 }
 
 /**
- * Get Netlify Blobs store for dashboard data with strong consistency
- * Strong consistency ensures immediate visibility of updates
- */
-function getDashboardStore() {
-  return getStore({
-    name: "dashboard",
-    consistency: "strong", // Critical for immediate updates
-  });
-}
-
-/**
- * Fetch dashboard data from Netlify Blobs or local file system
+ * Fetch dashboard data from Netlify DB or local file system
  * Returns null if no data exists
  */
 export async function getDashboardData(): Promise<TestResult | null> {
@@ -63,13 +62,20 @@ export async function getDashboardData(): Promise<TestResult | null> {
     }
   }
 
-  // Use Netlify Blobs in production
-  console.log("☁️ [STORAGE] Using Netlify Blobs (production mode)");
+  // Use Netlify DB in production
+  console.log("☁️ [STORAGE] Using Netlify DB (production mode)");
   try {
-    const store = getDashboardStore();
-    console.log("🔗 [STORAGE] Store connected:", { name: "dashboard", key: BLOB_KEY });
+    const sql = neon();
+    console.log("🔗 [STORAGE] Database connected");
 
-    const data = await store.get(BLOB_KEY, { type: "json" });
+    const [row] = await sql`
+      SELECT data FROM dashboard
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+
+    const data = row ? (row.data as TestResult) : null;
+
     console.log("📊 [STORAGE] Data retrieved:", {
       hasData: !!data,
       timestamp: data?.timestamp,
@@ -89,12 +95,12 @@ export async function getDashboardData(): Promise<TestResult | null> {
     }
 
     if (!data) {
-      console.log("⚠️ [STORAGE] No data found in blob store");
+      console.log("⚠️ [STORAGE] No data found in database");
       return null;
     }
 
     console.log("✅ [STORAGE] Data fetched successfully");
-    return data as TestResult;
+    return data;
   } catch (error) {
     console.error("❌ [STORAGE] Failed to fetch dashboard data:", error);
     return null;
@@ -102,8 +108,8 @@ export async function getDashboardData(): Promise<TestResult | null> {
 }
 
 /**
- * Save dashboard data to Netlify Blobs or local file system
- * Uses strong consistency for immediate visibility
+ * Save dashboard data to Netlify DB or local file system
+ * The database trigger ensures only the most recent record is kept
  */
 export async function saveDashboardData(data: TestResult): Promise<void> {
   console.log("💾 [STORAGE] Saving data...");
@@ -145,14 +151,19 @@ export async function saveDashboardData(data: TestResult): Promise<void> {
     }
   }
 
-  // Use Netlify Blobs in production
-  console.log("☁️ [STORAGE] Using Netlify Blobs (production mode)");
+  // Use Netlify DB in production
+  console.log("☁️ [STORAGE] Using Netlify DB (production mode)");
   try {
-    const store = getDashboardStore();
-    console.log("🔗 [STORAGE] Store connected");
+    const sql = neon();
+    console.log("🔗 [STORAGE] Database connected");
 
-    await store.setJSON(BLOB_KEY, data);
-    console.log("✅ [STORAGE] Data saved successfully to blob store");
+    // Insert new record (trigger will delete old ones automatically)
+    await sql`
+      INSERT INTO dashboard (data, updated_at)
+      VALUES (${JSON.stringify(data)}, NOW())
+    `;
+
+    console.log("✅ [STORAGE] Data saved successfully to database");
   } catch (error) {
     console.error("❌ [STORAGE] Failed to save dashboard data:", error);
     throw error;

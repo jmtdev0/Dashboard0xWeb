@@ -17,11 +17,15 @@
     "hash-password": "tsx scripts/generate-password-hash.ts",
     "migrate-dashboard-data": "tsx scripts/migrate-dashboard-data.ts",
     "sync-todos": "tsx scripts/sync-todos-from-production.ts",
-    "check-blob-config": "node scripts/check-blob-config.js"
+    "check-blob-config": "node scripts/check-blob-config.js",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:migrate": "tsx scripts/migrate-blobs-to-db.ts",
+    "db:status": "netlify db status"
   },
   "dependencies": {
     "@netlify/blobs": "^10.5.0",
     "@netlify/functions": "^5.1.2",
+    "@netlify/neon": "^0.1.2",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.1.2",

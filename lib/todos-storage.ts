@@ -1,18 +1,25 @@
-import { getStore } from "@netlify/blobs";
+import { neon } from "@netlify/neon";
 import { Todo, TodoListData } from "./types/todo";
 import { promises as fs } from "fs";
 import path from "path";
 
-const BLOB_KEY = "todos-data";
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".local-data");
 const LOCAL_TODOS_FILE = path.join(LOCAL_DATA_DIR, "todos-data.json");
 
 /**
- * Check if we're running in local development WITHOUT Netlify
- * When running with `netlify dev`, we want to use Netlify Blobs (same as production)
- *
- * If NETLIFY_BLOBS_SITE_ID and NETLIFY_BLOBS_TOKEN are set, we'll use production blobs
- * even in local development (useful for working with the same data as production)
+ * Check if we can use Netlify DB
+ */
+function canUseDatabase(): boolean {
+  return !!(
+    process.env.NETLIFY_DATABASE_URL ||
+    process.env.NETLIFY ||
+    process.env.NETLIFY_DEV
+  );
+}
+
+/**
+ * Check if we're running in local development WITHOUT Netlify DB
+ * When running with `netlify dev`, we want to use Netlify DB (same as production)
  */
 function isLocalDevelopment(): boolean {
   // Log for debugging
@@ -20,18 +27,12 @@ function isLocalDevelopment(): boolean {
     NETLIFY: process.env.NETLIFY,
     NODE_ENV: process.env.NODE_ENV,
     NETLIFY_DEV: process.env.NETLIFY_DEV,
-    HAS_BLOB_CREDENTIALS: !!(process.env.NETLIFY_BLOBS_SITE_ID && process.env.NETLIFY_BLOBS_TOKEN),
+    HAS_DATABASE_URL: !!process.env.NETLIFY_DATABASE_URL,
   });
 
-  // If production blob credentials are provided, always use Netlify Blobs (even in local dev)
-  if (process.env.NETLIFY_BLOBS_SITE_ID && process.env.NETLIFY_BLOBS_TOKEN) {
-    console.log("🔑 [TODO STORAGE] Production blob credentials detected - using Netlify Blobs");
-    return false; // Use Netlify Blobs, not local files
-  }
-
   // If NETLIFY or NETLIFY_DEV is set, we're running with netlify dev or in production
-  // Only use local file storage when running pure Next.js dev server without blob credentials
-  const useLocalFile = !process.env.NETLIFY && !process.env.NETLIFY_DEV && process.env.NODE_ENV !== "production";
+  // Only use local file storage when running pure Next.js dev server without database
+  const useLocalFile = !canUseDatabase() && process.env.NODE_ENV !== "production";
   console.log("🔍 [TODO STORAGE] Use local file:", useLocalFile);
   return useLocalFile;
 }
@@ -48,32 +49,8 @@ async function ensureLocalDataDir(): Promise<void> {
 }
 
 /**
- * Get Netlify Blobs store with strong consistency
- * Strong consistency ensures immediate visibility of updates
- * 
- * When running locally with netlify dev, we can optionally connect directly
- * to production blob storage by setting NETLIFY_BLOBS_SITE_ID and NETLIFY_BLOBS_TOKEN
- */
-function getTodoStore() {
-  const config: any = {
-    name: "todos",
-    consistency: "strong", // Critical for immediate updates
-  };
-
-  // If explicit credentials are provided (for local dev accessing production),
-  // use them instead of default environment detection
-  if (process.env.NETLIFY_BLOBS_SITE_ID && process.env.NETLIFY_BLOBS_TOKEN) {
-    console.log("🔑 [TODO STORAGE] Using explicit Netlify Blobs credentials (production access)");
-    config.siteID = process.env.NETLIFY_BLOBS_SITE_ID;
-    config.token = process.env.NETLIFY_BLOBS_TOKEN;
-  }
-
-  return getStore(config);
-}
-
-/**
- * Fetch all todos from Netlify Blobs or local file system
- * Returns empty array if no data exists
+ * Fetch all todos from Netlify DB or local file system
+ * Returns empty TodoListData if no data exists
  */
 export async function getAllTodos(): Promise<TodoListData> {
   console.log("📋 [TODO STORAGE] Fetching todos...");
@@ -96,19 +73,23 @@ export async function getAllTodos(): Promise<TodoListData> {
     }
   }
 
-  // Use Netlify Blobs in production
-  console.log("☁️ [TODO STORAGE] Using Netlify Blobs (production mode)");
+  // Use Netlify DB in production
+  console.log("☁️ [TODO STORAGE] Using Netlify DB (production mode)");
   try {
-    const store = getTodoStore();
-    const data = await store.get(BLOB_KEY, { type: "json" });
+    const sql = neon();
+    const [row] = await sql`
+      SELECT data FROM todos
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
 
-    if (!data) {
-      console.log("⚠️ [TODO STORAGE] No todos found in blob store");
+    if (!row) {
+      console.log("⚠️ [TODO STORAGE] No todos found in database");
       return { todos: [], lastModified: new Date().toISOString() };
     }
 
     console.log("✅ [TODO STORAGE] Todos fetched successfully");
-    return data as TodoListData;
+    return row.data as TodoListData;
   } catch (error) {
     console.error("❌ [TODO STORAGE] Failed to fetch todos:", error);
     return { todos: [], lastModified: new Date().toISOString() };
@@ -116,8 +97,8 @@ export async function getAllTodos(): Promise<TodoListData> {
 }
 
 /**
- * Save todos to Netlify Blobs or local file system
- * Uses strong consistency for immediate visibility
+ * Save todos to Netlify DB or local file system
+ * The database trigger ensures only the most recent record is kept
  */
 export async function saveTodos(todos: Todo[]): Promise<void> {
   console.log("💾 [TODO STORAGE] Saving todos...", todos.length, "items");
@@ -145,12 +126,18 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
     }
   }
 
-  // Use Netlify Blobs in production
-  console.log("☁️ [TODO STORAGE] Using Netlify Blobs (production mode)");
+  // Use Netlify DB in production
+  console.log("☁️ [TODO STORAGE] Using Netlify DB (production mode)");
   try {
-    const store = getTodoStore();
-    await store.setJSON(BLOB_KEY, data);
-    console.log("✅ [TODO STORAGE] Todos saved successfully to blob store");
+    const sql = neon();
+
+    // Insert new record (trigger will delete old ones automatically)
+    await sql`
+      INSERT INTO todos (data, updated_at)
+      VALUES (${JSON.stringify(data)}, NOW())
+    `;
+
+    console.log("✅ [TODO STORAGE] Todos saved successfully to database");
   } catch (error) {
     console.error("❌ [TODO STORAGE] Failed to save todos:", error);
     throw error;
