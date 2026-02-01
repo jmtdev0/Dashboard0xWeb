@@ -73,7 +73,20 @@ export async function getDashboardData(): Promise<TestResult | null> {
     console.log("📊 [STORAGE] Data retrieved:", {
       hasData: !!data,
       timestamp: data?.timestamp,
+      hasCrypto: !!(data as any)?.results?.crypto,
     });
+
+    // Log crypto data details after retrieval
+    if (data && (data as any).results?.crypto) {
+      console.log("₿ [STORAGE] Crypto data after retrieval:", {
+        success: (data as any).results.crypto.success,
+        hasBTC: !!(data as any).results.crypto.btc,
+        hasSOL: !!(data as any).results.crypto.sol,
+        hasError: !!(data as any).results.crypto.error,
+        error: (data as any).results.crypto.error,
+        fullCryptoObject: JSON.stringify((data as any).results.crypto),
+      });
+    }
 
     if (!data) {
       console.log("⚠️ [STORAGE] No data found in blob store");
@@ -99,6 +112,20 @@ export async function saveDashboardData(data: TestResult): Promise<void> {
     hasResults: !!data.results,
     hasCrypto: !!data.results?.crypto,
   });
+
+  // Log crypto data details before saving
+  if (data.results?.crypto) {
+    console.log("₿ [STORAGE] Crypto data before save:", {
+      success: data.results.crypto.success,
+      hasBTC: !!data.results.crypto.btc,
+      hasSOL: !!data.results.crypto.sol,
+      hasError: !!data.results.crypto.error,
+      error: data.results.crypto.error,
+      fullCryptoObject: JSON.stringify(data.results.crypto),
+    });
+  } else {
+    console.warn("⚠️ [STORAGE] No crypto data to save!");
+  }
 
   // Use local file system in development
   if (isLocalDevelopment()) {

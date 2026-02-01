@@ -107,7 +107,19 @@ export async function runAllTests(): Promise<TestResult> {
     if (instagram.status === "fulfilled")
       results.results.instagram = instagram.value;
     if (github.status === "fulfilled") results.results.github = github.value;
-    if (crypto.status === "fulfilled") results.results.crypto = crypto.value;
+
+    // Handle crypto result - always store something, even if promise rejected
+    if (crypto.status === "fulfilled") {
+      results.results.crypto = crypto.value;
+      console.log("✅ [SCRAPER] Crypto promise fulfilled:", crypto.value);
+    } else {
+      console.error("❌ [SCRAPER] Crypto promise rejected:", crypto.reason);
+      results.results.crypto = {
+        success: false,
+        error: `Crypto scraper failed: ${crypto.reason?.message || 'Unknown error'}`,
+      };
+    }
+
     if (extensions.status === "fulfilled")
       results.results.extensions = extensions.value;
   } catch (error) {
@@ -382,6 +394,19 @@ async function testGitHub(browser: Browser): Promise<GithubResult> {
 }
 
 async function testCryptoPrices(): Promise<CryptoResult> {
+  try {
+    // Try CoinGecko first
+    return await attemptCryptoFetch();
+  } catch (unexpectedError) {
+    console.error("❌ [CRYPTO] Unexpected error in testCryptoPrices:", unexpectedError);
+    return {
+      success: false,
+      error: `Unexpected crypto error: ${unexpectedError instanceof Error ? unexpectedError.message : 'Unknown'}`,
+    };
+  }
+}
+
+async function attemptCryptoFetch(): Promise<CryptoResult> {
   // Try CoinGecko first
   try {
     console.log("₿ [CRYPTO] Fetching prices from CoinGecko API...");
