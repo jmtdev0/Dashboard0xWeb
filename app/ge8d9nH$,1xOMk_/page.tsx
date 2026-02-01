@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LoginForm from "./components/LoginForm";
 import SelectionScreen from "./components/SelectionScreen";
 import CryptoView from "./components/CryptoView";
@@ -11,6 +11,31 @@ type View = "login" | "selection" | "crypto" | "todos";
 export default function PrivatePage() {
   const [token, setToken] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("login");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check for existing valid cookie on mount
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/check");
+        const data = await response.json();
+
+        if (data.valid && data.token) {
+          console.log("✅ Valid auth cookie found, skipping login");
+          setToken(data.token);
+          setCurrentView("selection");
+        } else {
+          console.log("❌ No valid auth cookie found, showing login");
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkExistingAuth();
+  }, []);
 
   const handleLoginSuccess = (newToken: string) => {
     setToken(newToken);
@@ -28,6 +53,18 @@ export default function PrivatePage() {
   const handleBackToSelection = () => {
     setCurrentView("selection");
   };
+
+  // Show loading while checking for existing auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-100 to-blue-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Verificando autenticación...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show login form if no token
   if (!token || currentView === "login") {
