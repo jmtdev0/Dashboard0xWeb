@@ -384,7 +384,7 @@ async function testGitHub(browser: Browser): Promise<GithubResult> {
 async function testCryptoPrices(): Promise<CryptoResult> {
   // Try CoinGecko first
   try {
-    console.log("Fetching crypto prices from CoinGecko...");
+    console.log("₿ [CRYPTO] Fetching prices from CoinGecko API...");
 
     const response = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=eur&include_24hr_change=true",
@@ -395,13 +395,22 @@ async function testCryptoPrices(): Promise<CryptoResult> {
       }
     );
 
+    console.log("₿ [CRYPTO] CoinGecko response status:", response.status);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("₿ [CRYPTO] CoinGecko API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText.substring(0, 200),
+      });
       throw new Error(`CoinGecko API error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log("₿ [CRYPTO] CoinGecko raw data:", JSON.stringify(data, null, 2));
 
-    return {
+    const result = {
       success: true,
       btc: {
         price: data.bitcoin.eur,
@@ -412,27 +421,59 @@ async function testCryptoPrices(): Promise<CryptoResult> {
         change24h: data.solana.eur_24h_change,
       },
     };
+
+    console.log("✅ [CRYPTO] CoinGecko success:", {
+      btcPrice: result.btc.price,
+      btcChange: result.btc.change24h,
+      solPrice: result.sol.price,
+      solChange: result.sol.change24h,
+    });
+
+    return result;
   } catch (coinGeckoError) {
-    console.warn("CoinGecko failed, trying CoinCap API...", coinGeckoError);
+    console.warn("⚠️ [CRYPTO] CoinGecko failed, trying CoinCap API fallback...");
+    console.error("₿ [CRYPTO] CoinGecko error details:", coinGeckoError);
 
     // Fallback to CoinCap API
     try {
+      console.log("₿ [CRYPTO] Fetching from CoinCap API (fallback)...");
+
       const [btcResponse, solResponse] = await Promise.all([
         fetch("https://api.coincap.io/v2/assets/bitcoin"),
         fetch("https://api.coincap.io/v2/assets/solana"),
       ]);
 
+      console.log("₿ [CRYPTO] CoinCap responses:", {
+        btcStatus: btcResponse.status,
+        solStatus: solResponse.status,
+      });
+
       if (!btcResponse.ok || !solResponse.ok) {
+        const btcError = !btcResponse.ok ? await btcResponse.text() : null;
+        const solError = !solResponse.ok ? await solResponse.text() : null;
+        console.error("₿ [CRYPTO] CoinCap API error:", {
+          btcStatus: btcResponse.status,
+          solStatus: solResponse.status,
+          btcError: btcError?.substring(0, 200),
+          solError: solError?.substring(0, 200),
+        });
         throw new Error("CoinCap API error");
       }
 
       const btcData = await btcResponse.json();
       const solData = await solResponse.json();
 
+      console.log("₿ [CRYPTO] CoinCap raw data:", {
+        btcPrice: btcData.data.priceUsd,
+        btcChange: btcData.data.changePercent24Hr,
+        solPrice: solData.data.priceUsd,
+        solChange: solData.data.changePercent24Hr,
+      });
+
       // CoinCap provides prices in USD, convert to EUR (approximate rate: 1 EUR = 1.09 USD)
       const usdToEur = 0.92;
 
-      return {
+      const result = {
         success: true,
         btc: {
           price: Math.round(parseFloat(btcData.data.priceUsd) * usdToEur),
@@ -443,12 +484,26 @@ async function testCryptoPrices(): Promise<CryptoResult> {
           change24h: parseFloat(solData.data.changePercent24Hr),
         },
       };
+
+      console.log("✅ [CRYPTO] CoinCap success (fallback):", {
+        btcPrice: result.btc.price,
+        btcChange: result.btc.change24h,
+        solPrice: result.sol.price,
+        solChange: result.sol.change24h,
+      });
+
+      return result;
     } catch (coinCapError) {
-      console.error("All crypto APIs failed:", coinCapError);
-      return {
+      console.error("❌ [CRYPTO] All crypto APIs failed!");
+      console.error("₿ [CRYPTO] CoinCap error details:", coinCapError);
+
+      const errorResult = {
         success: false,
         error: "Unable to fetch crypto prices (APIs unavailable)",
       };
+
+      console.error("₿ [CRYPTO] Returning error result:", errorResult);
+      return errorResult;
     }
   }
 }

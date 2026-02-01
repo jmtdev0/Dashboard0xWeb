@@ -46,16 +46,17 @@ export async function GET(request: Request) {
     }
 
     // Token is valid - return private data
-    console.log("📦 [PRIVATE] Fetching dashboard data");
+    console.log("📦 [PRIVATE] Fetching dashboard data from storage...");
     const data = await getDashboardData();
-    console.log("📊 [PRIVATE] Data retrieved:", {
+    console.log("📊 [PRIVATE] Data retrieved from storage:", {
       hasData: !!data,
       timestamp: data?.timestamp,
+      hasResults: !!data?.results,
       hasCrypto: !!data?.results?.crypto,
     });
 
     if (!data) {
-      console.log("⚠️ [PRIVATE] No data available");
+      console.log("⚠️ [PRIVATE] No data available in storage");
       return NextResponse.json({
         timestamp: null,
         crypto: null,
@@ -64,12 +65,35 @@ export async function GET(request: Request) {
     }
 
     // Extract only crypto data
+    const cryptoData = data.results.crypto || null;
+
+    console.log("₿ [PRIVATE] Crypto data details:", {
+      hasCrypto: !!cryptoData,
+      success: cryptoData?.success,
+      hasBTC: !!cryptoData?.btc,
+      hasSOL: !!cryptoData?.sol,
+      error: cryptoData?.error,
+    });
+
+    if (cryptoData) {
+      console.log("₿ [PRIVATE] Crypto prices:", {
+        btc: cryptoData.btc ? {
+          price: cryptoData.btc.price,
+          change24h: cryptoData.btc.change24h,
+        } : null,
+        sol: cryptoData.sol ? {
+          price: cryptoData.sol.price,
+          change24h: cryptoData.sol.change24h,
+        } : null,
+      });
+    }
+
     const privateData = {
       timestamp: data.timestamp,
-      crypto: data.results.crypto || null,
+      crypto: cryptoData,
     };
 
-    console.log("✅ [PRIVATE] Returning crypto data");
+    console.log("✅ [PRIVATE] Returning crypto data to client");
     return NextResponse.json(privateData);
   } catch (error) {
     console.error("❌ [PRIVATE] Private data fetch error:", error);

@@ -32,12 +32,15 @@ export default function PrivateDashboard({
   }, [token]);
 
   const loadData = async () => {
+    console.log("🔐 [PRIVATE DASHBOARD] Loading crypto data...");
     try {
       const response = await fetch("/api/private/data", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      console.log("📡 [PRIVATE DASHBOARD] Response status:", response.status);
 
       if (response.status === 401) {
         // Token expired or invalid - show error without logging out
@@ -46,14 +49,71 @@ export default function PrivateDashboard({
       }
 
       const result = await response.json();
+      console.log("📦 [PRIVATE DASHBOARD] Full response:", JSON.stringify(result, null, 2));
+
+      // Check if we have crypto data
+      console.log("🔍 [PRIVATE DASHBOARD] Response structure:", {
+        hasTimestamp: !!result.timestamp,
+        hasCrypto: !!result.crypto,
+        cryptoType: typeof result.crypto,
+        hasMessage: !!result.message,
+      });
 
       if (result.crypto) {
+        console.log("₿ [CRYPTO DATA] Analyzing crypto data...");
+        console.log("₿ [CRYPTO DATA] Success flag:", result.crypto.success);
+
+        // Check BTC data
+        if (result.crypto.btc) {
+          console.log("₿ [BTC] Found BTC data:", {
+            price: result.crypto.btc.price,
+            priceType: typeof result.crypto.btc.price,
+            change24h: result.crypto.btc.change24h,
+            changeType: typeof result.crypto.btc.change24h,
+          });
+        } else {
+          console.warn("⚠️ [BTC] No BTC data in response!");
+        }
+
+        // Check SOL data
+        if (result.crypto.sol) {
+          console.log("◎ [SOL] Found SOL data:", {
+            price: result.crypto.sol.price,
+            priceType: typeof result.crypto.sol.price,
+            change24h: result.crypto.sol.change24h,
+            changeType: typeof result.crypto.sol.change24h,
+          });
+        } else {
+          console.warn("⚠️ [SOL] No SOL data in response!");
+        }
+
+        // Check for error message
+        if (result.crypto.error) {
+          console.error("❌ [CRYPTO DATA] Error in crypto data:", result.crypto.error);
+        }
+
+        // Set the data
         setData(result);
-        setError(null);
+
+        // Only clear error if crypto.success is true AND we have data
+        if (result.crypto.success && (result.crypto.btc || result.crypto.sol)) {
+          setError(null);
+          console.log("✅ [PRIVATE DASHBOARD] Crypto data loaded successfully");
+        } else if (!result.crypto.success) {
+          const errorMsg = result.crypto.error || "Failed to fetch crypto prices";
+          console.error("❌ [PRIVATE DASHBOARD] Crypto fetch failed:", errorMsg);
+          setError(errorMsg);
+        } else {
+          console.warn("⚠️ [PRIVATE DASHBOARD] Crypto success=true but no BTC/SOL data");
+          setError("Crypto data incomplete");
+        }
       } else {
+        console.log("⚠️ [PRIVATE DASHBOARD] No crypto data in response");
+        console.log("📋 [PRIVATE DASHBOARD] Response message:", result.message);
         setError(result.message || "No data available yet");
       }
     } catch (err) {
+      console.error("❌ [PRIVATE DASHBOARD] Failed to load data:", err);
       setError("Failed to load data");
       console.error(err);
     }
@@ -189,7 +249,16 @@ export default function PrivateDashboard({
             </header>
 
             {/* Dashboard Grid */}
-            {data?.crypto && (
+            {data?.crypto && (() => {
+              console.log("🎨 [RENDER] Rendering crypto cards with data:", {
+                success: data.crypto.success,
+                hasBTC: !!data.crypto.btc,
+                hasSOL: !!data.crypto.sol,
+                error: data.crypto.error,
+                btcData: data.crypto.btc,
+                solData: data.crypto.sol,
+              });
+              return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* BTC Card */}
                 <ServiceCard
@@ -243,7 +312,8 @@ export default function PrivateDashboard({
                   error={data.crypto.error}
                 />
               </div>
-            )}
+              );
+            })()}
 
             {!data && !error && (
               <div className="text-center py-12">
@@ -302,6 +372,14 @@ function ServiceCard({
   data: Array<{ label: string; value: string; color?: string }>;
   error?: string;
 }) {
+  console.log(`🎴 [ServiceCard:${title}] Rendering with:`, {
+    status,
+    dataLength: data.length,
+    hasError: !!error,
+    error,
+    data: JSON.stringify(data),
+  });
+
   return (
     <div
       className={`bg-sky-50 dark:bg-sky-900/40 rounded-xl shadow-lg p-6 border-2 transition-all hover:shadow-xl ${
