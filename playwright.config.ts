@@ -36,7 +36,7 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         baseURL: NETLIFY_URL,
       },
-      testMatch: /.*\.netlify\.spec\.ts/,
+      testMatch: /.*\.netlify\.spec\.ts|.*debug.*\.spec\.ts/,
     },
     {
       name: "all",
