@@ -174,7 +174,7 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
     if (todoIds.length > 0) {
       await sql`
         DELETE FROM todos
-        WHERE id NOT IN ${sql(todoIds)}
+        WHERE NOT (id = ANY(${todoIds}))
       `;
     } else {
       // If no TODOs in array, delete all
