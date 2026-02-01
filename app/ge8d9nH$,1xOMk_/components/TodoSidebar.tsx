@@ -22,6 +22,7 @@ export default function TodoSidebar({
   const [filter, setFilter] = useState<FilterOption>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [isFixingEncoding, setIsFixingEncoding] = useState(false);
 
   // Load todos on mount
   useEffect(() => {
@@ -197,6 +198,39 @@ export default function TodoSidebar({
     }
   };
 
+  const handleFixEncoding = async () => {
+    if (!confirm("Fix character encoding for all todos? This will correct garbled characters like 'ñ' showing as '├▒'.")) {
+      return;
+    }
+
+    setIsFixingEncoding(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/todos/fix-encoding", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Reload todos to see the fixed data
+        await loadTodos();
+        alert(`✅ Fixed ${result.fixedCount} todos with encoding issues`);
+      } else {
+        setError(result.error || "Failed to fix encoding");
+      }
+    } catch (err) {
+      setError("Failed to fix encoding");
+      console.error(err);
+    } finally {
+      setIsFixingEncoding(false);
+    }
+  };
+
   // Filter todos
   const filteredTodos = todos.filter((todo) => {
     if (filter === "active") return !todo.completed;
@@ -301,6 +335,32 @@ export default function TodoSidebar({
               <option value="completedAt">By Completed</option>
             </select>
           </div>
+
+          {/* Fix Encoding Button - Only show if there might be encoding issues */}
+          {todos.some(t => /├▒|├│|├ş|├í|├ę|├║|├ü|Ã±|Ã³|Ã¡|Ã©|Ã­|Ãº|Ã/.test(t.text)) && (
+            <button
+              onClick={handleFixEncoding}
+              disabled={isFixingEncoding}
+              className="w-full mt-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-400 text-white text-xs rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isFixingEncoding ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Fixing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  Fix Garbled Characters (ñ, ó, etc.)
+                </>
+              )}
+            </button>
+          )}
 
           {error && (
             <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">

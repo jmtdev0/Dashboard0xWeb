@@ -62,7 +62,13 @@ export async function GET(request: Request) {
     console.log("📦 [TODOS] Fetching all todos...");
     const data = await getAllTodos();
     console.log("✅ [TODOS] Todos fetched successfully:", data.todos.length, "items");
-    return NextResponse.json(data);
+
+    // Explicitly set UTF-8 charset to prevent encoding issues
+    return NextResponse.json(data, {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+    });
   } catch (error) {
     console.error("❌ [TODOS] GET error:", error);
     return NextResponse.json(
