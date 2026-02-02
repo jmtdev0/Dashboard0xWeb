@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { text } = await request.json();
+    const { text, categoryId } = await request.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
@@ -124,6 +124,7 @@ export async function POST(request: Request) {
       completed: false,
       createdAt: new Date().toISOString(),
       completedAt: null,
+      categoryId: categoryId !== undefined ? categoryId : null,
     };
 
     const updatedTodos = [...todos, newTodo];
@@ -153,7 +154,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const { id, text, completed } = await request.json();
+    const { id, text, completed, categoryId } = await request.json();
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
@@ -192,6 +193,7 @@ export async function PUT(request: Request) {
         completed,
         completedAt: completed ? new Date().toISOString() : null,
       }),
+      ...(categoryId !== undefined && { categoryId }),
     };
 
     const updatedTodos = [...todos];

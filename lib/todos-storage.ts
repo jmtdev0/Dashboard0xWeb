@@ -83,7 +83,8 @@ export async function getAllTodos(): Promise<TodoListData> {
         text,
         completed,
         created_at as "createdAt",
-        completed_at as "completedAt"
+        completed_at as "completedAt",
+        category_id as "categoryId"
       FROM todos
       ORDER BY created_at DESC
     `;
@@ -95,6 +96,7 @@ export async function getAllTodos(): Promise<TodoListData> {
       completed: row.completed,
       createdAt: row.createdAt,
       completedAt: row.completedAt,
+      categoryId: row.categoryId,
     }));
 
     // Get last modified from most recent update
@@ -153,18 +155,20 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
     // Upsert each TODO (insert or update if exists)
     for (const todo of todos) {
       await sql`
-        INSERT INTO todos (id, text, completed, created_at, completed_at)
+        INSERT INTO todos (id, text, completed, created_at, completed_at, category_id)
         VALUES (
           ${todo.id},
           ${todo.text},
           ${todo.completed},
           ${todo.createdAt},
-          ${todo.completedAt}
+          ${todo.completedAt},
+          ${todo.categoryId}
         )
         ON CONFLICT (id) DO UPDATE SET
           text = EXCLUDED.text,
           completed = EXCLUDED.completed,
-          completed_at = EXCLUDED.completed_at
+          completed_at = EXCLUDED.completed_at,
+          category_id = EXCLUDED.category_id
       `;
     }
 

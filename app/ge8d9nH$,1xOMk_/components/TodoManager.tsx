@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Todo, SortOption, FilterOption } from "@/lib/types/todo";
+import CategoryManager from "./CategoryManager";
+import CategorySelector from "./CategorySelector";
+import CategoryFilter from "./CategoryFilter";
 
 interface TodoManagerProps {
   token: string;
@@ -18,6 +21,9 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [editText, setEditText] = useState("");
   const [isFixingEncoding, setIsFixingEncoding] = useState(false);
   const [isAddingTodo, setIsAddingTodo] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   useEffect(() => {
     loadTodos();
@@ -61,7 +67,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: newTodoText }),
+        body: JSON.stringify({ text: newTodoText, categoryId: selectedCategoryId }),
       });
 
       if (!response.ok) {
@@ -73,6 +79,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
       const newTodo = await response.json();
       setTodos([...todos, newTodo]);
       setNewTodoText("");
+      setSelectedCategoryId(null);
       setError(null);
     } catch (err) {
       setError("Failed to create todo");
@@ -226,8 +233,18 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const filteredTodos = todos.filter((todo) => {
-    if (filter === "active") return !todo.completed;
-    if (filter === "completed") return todo.completed;
+    // Filter by completion status
+    if (filter === "active" && todo.completed) return false;
+    if (filter === "completed" && !todo.completed) return false;
+
+    // Filter by category
+    if (categoryFilter === "uncategorized") {
+      return todo.categoryId === null;
+    }
+    if (categoryFilter) {
+      return todo.categoryId === categoryFilter;
+    }
+
     return true;
   });
 
@@ -261,6 +278,11 @@ export default function TodoManager({ token }: TodoManagerProps) {
             placeholder="Add new todo..."
             maxLength={500}
             className="w-full px-4 py-3 border-2 border-sky-300 dark:border-sky-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-sky-800/50 dark:text-sky-50"
+          />
+          <CategorySelector
+            token={token}
+            selectedCategoryId={selectedCategoryId}
+            onSelect={setSelectedCategoryId}
           />
           <button
             type="submit"
@@ -297,6 +319,14 @@ export default function TodoManager({ token }: TodoManagerProps) {
         </form>
 
         {/* Filters */}
+        <div className="mb-4">
+          <CategoryFilter
+            token={token}
+            selectedCategoryId={categoryFilter}
+            onFilterChange={setCategoryFilter}
+          />
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <select
             value={filter}
@@ -315,6 +345,26 @@ export default function TodoManager({ token }: TodoManagerProps) {
             <option value="createdAt">Sort by Created Date</option>
             <option value="completedAt">Sort by Completed Date</option>
           </select>
+          <button
+            onClick={() => setShowCategoryManager(true)}
+            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
+            title="Manage categories"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+              />
+            </svg>
+            <span className="hidden sm:inline">Categories</span>
+          </button>
           <button
             onClick={loadTodos}
             disabled={loading}
@@ -534,6 +584,14 @@ export default function TodoManager({ token }: TodoManagerProps) {
           </div>
         ))}
       </div>
+
+      {/* Category Manager Modal */}
+      {showCategoryManager && (
+        <CategoryManager
+          token={token}
+          onClose={() => setShowCategoryManager(false)}
+        />
+      )}
     </div>
   );
 }
