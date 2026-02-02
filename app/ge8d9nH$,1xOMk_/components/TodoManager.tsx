@@ -19,6 +19,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [filter, setFilter] = useState<FilterOption>("active");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [isFixingEncoding, setIsFixingEncoding] = useState(false);
   const [isAddingTodo, setIsAddingTodo] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
@@ -128,6 +129,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const handleStartEdit = (todo: Todo) => {
     setEditingId(todo.id);
     setEditText(todo.text);
+    setEditCategoryId(todo.categoryId);
   };
 
   const handleSaveEdit = async (todo: Todo) => {
@@ -146,6 +148,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
         body: JSON.stringify({
           id: todo.id,
           text: editText,
+          categoryId: editCategoryId,
         }),
       });
 
@@ -157,6 +160,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
       const updatedTodo = await response.json();
       setTodos(todos.map((t) => (t.id === todo.id ? updatedTodo : t)));
       setEditingId(null);
+      setEditCategoryId(null);
       setError(null);
     } catch (err) {
       setError("Failed to update todo");
@@ -167,6 +171,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditText("");
+    setEditCategoryId(null);
   };
 
   const handleDelete = async (todo: Todo) => {
@@ -496,6 +501,11 @@ export default function TodoManager({ token }: TodoManagerProps) {
                       onChange={(e) => setEditText(e.target.value)}
                       className="w-full px-3 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
                       autoFocus
+                    />
+                    <CategorySelector
+                      token={token}
+                      selectedCategoryId={editCategoryId}
+                      onSelect={setEditCategoryId}
                     />
                     <div className="flex gap-2">
                       <button
