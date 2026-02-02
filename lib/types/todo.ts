@@ -4,6 +4,7 @@ export interface Todo {
   completed: boolean;
   createdAt: string; // ISO 8601 timestamp
   completedAt: string | null; // ISO 8601 timestamp or null
+  categoryId: string | null; // Category reference or null for uncategorized
 }
 
 export interface TodoListData {
