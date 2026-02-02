@@ -17,6 +17,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [isFixingEncoding, setIsFixingEncoding] = useState(false);
+  const [isAddingTodo, setIsAddingTodo] = useState(false);
 
   useEffect(() => {
     loadTodos();
@@ -52,6 +53,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
 
     if (!newTodoText.trim()) return;
 
+    setIsAddingTodo(true);
     try {
       const response = await fetch("/api/todos", {
         method: "POST",
@@ -75,6 +77,8 @@ export default function TodoManager({ token }: TodoManagerProps) {
     } catch (err) {
       setError("Failed to create todo");
       console.error(err);
+    } finally {
+      setIsAddingTodo(false);
     }
   };
 
@@ -260,10 +264,35 @@ export default function TodoManager({ token }: TodoManagerProps) {
           />
           <button
             type="submit"
-            disabled={!newTodoText.trim() || todos.length >= 200}
-            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed"
+            disabled={!newTodoText.trim() || todos.length >= 200 || isAddingTodo}
+            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Add Todo ({todos.length}/200)
+            {isAddingTodo ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                Adding...
+              </>
+            ) : (
+              `Add Todo (${todos.length}/200)`
+            )}
           </button>
         </form>
 
