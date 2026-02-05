@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Todo, SortOption, FilterOption } from "@/lib/types/todo";
 
 interface TodoManagerProps {
   token: string;
+}
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  todoId: string | null;
 }
 
 export default function TodoManager({ token }: TodoManagerProps) {
@@ -17,10 +24,32 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [isFixingEncoding, setIsFixingEncoding] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    todoId: null,
+  });
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadTodos();
   }, [token]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+      }
+    };
+
+    if (contextMenu.visible) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [contextMenu.visible]);
 
   const loadTodos = async () => {
     try {
@@ -114,9 +143,41 @@ export default function TodoManager({ token }: TodoManagerProps) {
     }
   };
 
+  const handleTogglePin = async (todo: Todo) => {
+    const optimisticTodos = todos.map((t) =>
+      t.id === todo.id ? { ...t, pinned: !t.pinned } : t
+    );
+    setTodos(optimisticTodos);
+    setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+
+    try {
+      const response = await fetch("/api/todos", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: todo.id,
+          pinned: !todo.pinned,
+        }),
+      });
+
+      if (!response.ok) {
+        setTodos(todos);
+        setError("Failed to pin todo");
+      }
+    } catch (err) {
+      setTodos(todos);
+      setError("Failed to pin todo");
+      console.error(err);
+    }
+  };
+
   const handleStartEdit = (todo: Todo) => {
     setEditingId(todo.id);
     setEditText(todo.text);
+    setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
   };
 
   const handleSaveEdit = async (todo: Todo) => {
@@ -159,6 +220,8 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const handleDelete = async (todo: Todo) => {
+    setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+
     if (!confirm("Delete this todo?")) return;
 
     const optimisticTodos = todos.filter((t) => t.id !== todo.id);
@@ -182,6 +245,36 @@ export default function TodoManager({ token }: TodoManagerProps) {
       setTodos(todos);
       setError("Failed to delete todo");
       console.error(err);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, todoId: string) => {
+    e.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      todoId,
+    });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, todoId: string) => {
+    const timer = setTimeout(() => {
+      const touch = e.touches[0];
+      setContextMenu({
+        visible: true,
+        x: touch.clientX,
+        y: touch.clientY,
+        todoId,
+      });
+    }, 500); // 500ms long press
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
     }
   };
 
@@ -228,6 +321,11 @@ export default function TodoManager({ token }: TodoManagerProps) {
   });
 
   const sortedTodos = [...filteredTodos].sort((a, b) => {
+    // Always show pinned items first
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+
+    // Then sort by selected option
     if (sortBy === "createdAt") {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     } else {
@@ -239,6 +337,55 @@ export default function TodoManager({ token }: TodoManagerProps) {
       );
     }
   });
+
+  const handleExportJSON = () => {
+    const dataStr = JSON.stringify(sortedTodos, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `todos-${new Date().toISOString().split("T")[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCSV = () => {
+    const headers = ["ID", "Text", "Completed", "Pinned", "Created At", "Completed At"];
+    const rows = sortedTodos.map((todo) => [
+      todo.id,
+      `"${todo.text.replace(/"/g, '""')}"`, // Escape quotes
+      todo.completed ? "Yes" : "No",
+      todo.pinned ? "Yes" : "No",
+      todo.createdAt,
+      todo.completedAt || "",
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.join(",")),
+    ].join("\n");
+
+    const dataBlob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `todos-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyToClipboard = () => {
+    const text = sortedTodos
+      .map((todo) => `${todo.pinned ? "📌 " : ""}${todo.completed ? "✓" : "○"} ${todo.text}`)
+      .join("\n");
+
+    navigator.clipboard.writeText(text).then(
+      () => alert("✅ Copied to clipboard!"),
+      () => setError("Failed to copy to clipboard")
+    );
+  };
+
+  const selectedTodo = todos.find((t) => t.id === contextMenu.todoId);
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -267,46 +414,85 @@ export default function TodoManager({ token }: TodoManagerProps) {
           </button>
         </form>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as FilterOption)}
-            className="flex-1 px-4 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
-          >
-            <option value="active">Active</option>
-            <option value="all">All Todos</option>
-            <option value="completed">Completed</option>
-          </select>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="flex-1 px-4 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
-          >
-            <option value="createdAt">Sort by Created Date</option>
-            <option value="completedAt">Sort by Completed Date</option>
-          </select>
-          <button
-            onClick={loadTodos}
-            disabled={loading}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            title="Refresh todo list"
-          >
-            <svg
-              className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        {/* Filters and Export Buttons */}
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as FilterOption)}
+              className="flex-1 px-4 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+              <option value="active">Active</option>
+              <option value="all">All Todos</option>
+              <option value="completed">Completed</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="flex-1 px-4 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
+            >
+              <option value="createdAt">Sort by Created Date</option>
+              <option value="completedAt">Sort by Completed Date</option>
+            </select>
+            <button
+              onClick={loadTodos}
+              disabled={loading}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              title="Refresh todo list"
+            >
+              <svg
+                className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+
+          {/* Export Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handleExportJSON}
+              disabled={sortedTodos.length === 0}
+              className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              title="Export filtered todos as JSON"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Export JSON</span>
+            </button>
+            <button
+              onClick={handleExportCSV}
+              disabled={sortedTodos.length === 0}
+              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              title="Export filtered todos as CSV"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Export CSV</span>
+            </button>
+            <button
+              onClick={handleCopyToClipboard}
+              disabled={sortedTodos.length === 0}
+              className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              title="Copy filtered todos to clipboard"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>Copy</span>
+            </button>
+          </div>
         </div>
 
         {/* Fix Encoding Button */}
@@ -369,6 +555,41 @@ export default function TodoManager({ token }: TodoManagerProps) {
         )}
       </div>
 
+      {/* Context Menu */}
+      {contextMenu.visible && selectedTodo && (
+        <div
+          ref={contextMenuRef}
+          className="fixed bg-white dark:bg-sky-800 border-2 border-sky-300 dark:border-sky-600 rounded-lg shadow-xl z-50 py-1 min-w-[200px]"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button
+            onClick={() => handleTogglePin(selectedTodo)}
+            className="w-full px-4 py-2 text-left hover:bg-sky-100 dark:hover:bg-sky-700 text-slate-900 dark:text-sky-50 flex items-center gap-2"
+          >
+            <span className="text-lg">📌</span>
+            {selectedTodo.pinned ? "Unpin" : "Pin"}
+          </button>
+          <button
+            onClick={() => handleStartEdit(selectedTodo)}
+            className="w-full px-4 py-2 text-left hover:bg-sky-100 dark:hover:bg-sky-700 text-slate-900 dark:text-sky-50 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit
+          </button>
+          <button
+            onClick={() => handleDelete(selectedTodo)}
+            className="w-full px-4 py-2 text-left hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
+          </button>
+        </div>
+      )}
+
       {/* Todo List */}
       <div className="space-y-3">
         {loading && (
@@ -397,6 +618,10 @@ export default function TodoManager({ token }: TodoManagerProps) {
                 ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
                 : "bg-sky-50 dark:bg-sky-800/40 border-sky-200 dark:border-sky-700"
             }`}
+            onContextMenu={(e) => handleContextMenu(e, todo.id)}
+            onTouchStart={(e) => handleTouchStart(e, todo.id)}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchEnd}
           >
             <div className="flex items-start gap-3">
               {/* Checkbox */}
@@ -442,6 +667,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
                           : "text-slate-900 dark:text-sky-50"
                       }`}
                     >
+                      {todo.pinned && <span className="mr-2">📌</span>}
                       {todo.text}
                     </p>
                     <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-slate-600 dark:text-sky-300">
@@ -458,47 +684,10 @@ export default function TodoManager({ token }: TodoManagerProps) {
                 )}
               </div>
 
-              {/* Actions */}
+              {/* Actions - Hidden, use context menu instead */}
               {editingId !== todo.id && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleStartEdit(todo)}
-                    className="p-2 hover:bg-sky-200 dark:hover:bg-sky-700 rounded-lg transition-colors"
-                    aria-label="Edit"
-                  >
-                    <svg
-                      className="w-5 h-5 text-slate-700 dark:text-sky-200"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(todo)}
-                    className="p-2 hover:bg-red-200 dark:hover:bg-red-900 rounded-lg transition-colors"
-                    aria-label="Delete"
-                  >
-                    <svg
-                      className="w-5 h-5 text-red-600 dark:text-red-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
+                <div className="opacity-0 pointer-events-none">
+                  {/* Placeholder for layout consistency */}
                 </div>
               )}
             </div>
