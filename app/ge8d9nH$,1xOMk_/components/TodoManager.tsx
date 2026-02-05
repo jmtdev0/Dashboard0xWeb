@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Todo, SortOption, FilterOption } from "@/lib/types/todo";
+import CategoryManager from "./CategoryManager";
+import CategorySelector from "./CategorySelector";
+import CategoryFilter from "./CategoryFilter";
 
 interface TodoManagerProps {
   token: string;
@@ -23,7 +26,12 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [filter, setFilter] = useState<FilterOption>("active");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [isFixingEncoding, setIsFixingEncoding] = useState(false);
+  const [isAddingTodo, setIsAddingTodo] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -81,6 +89,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
 
     if (!newTodoText.trim()) return;
 
+    setIsAddingTodo(true);
     try {
       const response = await fetch("/api/todos", {
         method: "POST",
@@ -88,7 +97,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: newTodoText }),
+        body: JSON.stringify({ text: newTodoText, categoryId: selectedCategoryId }),
       });
 
       if (!response.ok) {
@@ -100,10 +109,13 @@ export default function TodoManager({ token }: TodoManagerProps) {
       const newTodo = await response.json();
       setTodos([...todos, newTodo]);
       setNewTodoText("");
+      setSelectedCategoryId(null);
       setError(null);
     } catch (err) {
       setError("Failed to create todo");
       console.error(err);
+    } finally {
+      setIsAddingTodo(false);
     }
   };
 
@@ -177,6 +189,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const handleStartEdit = (todo: Todo) => {
     setEditingId(todo.id);
     setEditText(todo.text);
+    setEditCategoryId(todo.categoryId);
     setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
   };
 
@@ -196,6 +209,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
         body: JSON.stringify({
           id: todo.id,
           text: editText,
+          categoryId: editCategoryId,
         }),
       });
 
@@ -207,6 +221,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
       const updatedTodo = await response.json();
       setTodos(todos.map((t) => (t.id === todo.id ? updatedTodo : t)));
       setEditingId(null);
+      setEditCategoryId(null);
       setError(null);
     } catch (err) {
       setError("Failed to update todo");
@@ -217,6 +232,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditText("");
+    setEditCategoryId(null);
   };
 
   const handleDelete = async (todo: Todo) => {
@@ -267,7 +283,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
         y: touch.clientY,
         todoId,
       });
-    }, 500); // 500ms long press
+    }, 500);
     setLongPressTimer(timer);
   };
 
@@ -315,8 +331,18 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const filteredTodos = todos.filter((todo) => {
-    if (filter === "active") return !todo.completed;
-    if (filter === "completed") return todo.completed;
+    // Filter by completion status
+    if (filter === "active" && todo.completed) return false;
+    if (filter === "completed" && !todo.completed) return false;
+
+    // Filter by category
+    if (categoryFilter === "uncategorized") {
+      return todo.categoryId === null;
+    }
+    if (categoryFilter) {
+      return todo.categoryId === categoryFilter;
+    }
+
     return true;
   });
 
@@ -350,12 +376,13 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const handleExportCSV = () => {
-    const headers = ["ID", "Text", "Completed", "Pinned", "Created At", "Completed At"];
+    const headers = ["ID", "Text", "Completed", "Pinned", "Category ID", "Created At", "Completed At"];
     const rows = sortedTodos.map((todo) => [
       todo.id,
-      `"${todo.text.replace(/"/g, '""')}"`, // Escape quotes
+      `"${todo.text.replace(/"/g, '""')}"`,
       todo.completed ? "Yes" : "No",
       todo.pinned ? "Yes" : "No",
+      todo.categoryId || "",
       todo.createdAt,
       todo.completedAt || "",
     ]);
@@ -405,16 +432,55 @@ export default function TodoManager({ token }: TodoManagerProps) {
             maxLength={500}
             className="w-full px-4 py-3 border-2 border-sky-300 dark:border-sky-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-sky-800/50 dark:text-sky-50"
           />
+          <CategorySelector
+            token={token}
+            selectedCategoryId={selectedCategoryId}
+            onSelect={setSelectedCategoryId}
+          />
           <button
             type="submit"
-            disabled={!newTodoText.trim() || todos.length >= 200}
-            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed"
+            disabled={!newTodoText.trim() || todos.length >= 200 || isAddingTodo}
+            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Add Todo ({todos.length}/200)
+            {isAddingTodo ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                Adding...
+              </>
+            ) : (
+              `Add Todo (${todos.length}/200)`
+            )}
           </button>
         </form>
 
-        {/* Filters and Export Buttons */}
+        {/* Category Filter */}
+        <div className="mb-4">
+          <CategoryFilter
+            token={token}
+            selectedCategoryId={categoryFilter}
+            onFilterChange={setCategoryFilter}
+          />
+        </div>
+
+        {/* Filters and Actions */}
         <div className="flex flex-col gap-3 mb-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <select
@@ -434,6 +500,26 @@ export default function TodoManager({ token }: TodoManagerProps) {
               <option value="createdAt">Sort by Created Date</option>
               <option value="completedAt">Sort by Completed Date</option>
             </select>
+            <button
+              onClick={() => setShowCategoryManager(true)}
+              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
+              title="Manage categories"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                />
+              </svg>
+              <span className="hidden sm:inline">Categories</span>
+            </button>
             <button
               onClick={loadTodos}
               disabled={loading}
@@ -643,6 +729,11 @@ export default function TodoManager({ token }: TodoManagerProps) {
                       className="w-full px-3 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
                       autoFocus
                     />
+                    <CategorySelector
+                      token={token}
+                      selectedCategoryId={editCategoryId}
+                      onSelect={setEditCategoryId}
+                    />
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleSaveEdit(todo)}
@@ -694,6 +785,14 @@ export default function TodoManager({ token }: TodoManagerProps) {
           </div>
         ))}
       </div>
+
+      {/* Category Manager Modal */}
+      {showCategoryManager && (
+        <CategoryManager
+          token={token}
+          onClose={() => setShowCategoryManager(false)}
+        />
+      )}
     </div>
   );
 }

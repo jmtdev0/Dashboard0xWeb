@@ -225,6 +225,50 @@ El dashboard privado requiere autenticación con contraseña y permite gestionar
 - ✅ **HTTPS enforced** por Netlify
 - ✅ **Anti brute-force** con delay de 1 segundo en fallos
 
+## Sistema de Categorías para TODOs
+
+El sistema de TODOs incluye categorías dinámicas con soporte para subcategorías de N niveles.
+
+### Características
+
+- ✅ **Categorías dinámicas** - Creadas y gestionadas por el usuario
+- ✅ **N niveles de subcategorías** - Estructura de árbol ilimitada
+- ✅ **TODOs sin categoría** - Soporte para TODOs no categorizados
+- ✅ **Filtrado por categoría** - Filtra TODOs por categoría seleccionada
+- ✅ **Gestión completa** - Crear, editar y eliminar categorías
+- ✅ **Cascada automática** - Al borrar una categoría, se borran todas sus subcategorías
+
+### Migración de Base de Datos
+
+**IMPORTANTE:** Antes de usar el sistema de categorías, debes ejecutar el script de migración para crear las tablas necesarias en Netlify DB.
+
+1. **En producción o con Netlify CLI:**
+   ```bash
+   # Asegúrate de tener las credenciales de Netlify configuradas
+   npm run db:add-categories
+   ```
+
+2. **Verificar que la migración fue exitosa:**
+   ```bash
+   npm run db:status
+   ```
+
+La migración crea:
+- Tabla `categories` con estructura de árbol recursivo
+- Columna `category_id` en tabla `todos`
+- Índices optimizados para consultas
+- Triggers para mantener timestamps actualizados
+
+### Uso del Sistema de Categorías
+
+1. **Gestionar categorías:** Click en botón "Categories" en el dashboard de TODOs
+2. **Añadir categoría:** Especifica nombre y opcionalmente una categoría padre
+3. **Crear subcategorías:** Click en "Add Sub" de una categoría existente
+4. **Editar categoría:** Click en "Edit" para cambiar el nombre
+5. **Eliminar categoría:** Click en "Delete" (elimina también subcategorías)
+6. **Asignar categoría a TODO:** Selecciona categoría al crear/editar TODO
+7. **Filtrar por categoría:** Usa el dropdown "Filter by Category"
+
 ## Scraping Automático
 
 La aplicación ejecuta scraping automático diariamente a las **3 AM UTC** usando Netlify Scheduled Functions.
@@ -317,9 +361,13 @@ netlify --version
 - `POST /api/private/logout` - Logout
 - `GET /api/private/data` - Obtener datos privados (cripto)
 - `GET /api/todos` - Obtener TODOs
-- `POST /api/todos` - Crear TODO
-- `PUT /api/todos/:id` - Actualizar TODO
+- `POST /api/todos` - Crear TODO (body: `{text, categoryId?}`)
+- `PUT /api/todos/:id` - Actualizar TODO (body: `{text?, completed?, categoryId?}`)
 - `DELETE /api/todos/:id` - Eliminar TODO
+- `GET /api/categories` - Obtener categorías (query: `?flat=true` para lista plana)
+- `POST /api/categories` - Crear categoría (body: `{name, parentId?}`)
+- `PUT /api/categories/:id` - Actualizar categoría (body: `{name}`)
+- `DELETE /api/categories/:id` - Eliminar categoría y subcategorías
 
 ## Tecnologías
 

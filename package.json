@@ -21,6 +21,7 @@
     "db:init": "tsx scripts/init-db.ts",
     "db:migrate": "tsx scripts/migrate-blobs-to-db.ts",
     "db:migrate-todos": "tsx scripts/migrate-todos-to-relational.ts",
+    "db:add-categories": "tsx scripts/add-categories.ts",
     "db:status": "netlify db status"
   },
   "dependencies": {
