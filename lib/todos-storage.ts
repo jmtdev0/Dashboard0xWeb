@@ -82,11 +82,12 @@ export async function getAllTodos(): Promise<TodoListData> {
         id,
         text,
         completed,
+        pinned,
         created_at as "createdAt",
         completed_at as "completedAt",
         category_id as "categoryId"
       FROM todos
-      ORDER BY created_at DESC
+      ORDER BY pinned DESC, created_at DESC
     `;
 
     // Map database rows to Todo objects
@@ -94,6 +95,7 @@ export async function getAllTodos(): Promise<TodoListData> {
       id: row.id,
       text: row.text,
       completed: row.completed,
+      pinned: row.pinned,
       createdAt: row.createdAt,
       completedAt: row.completedAt,
       categoryId: row.categoryId,
@@ -155,11 +157,12 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
     // Upsert each TODO (insert or update if exists)
     for (const todo of todos) {
       await sql`
-        INSERT INTO todos (id, text, completed, created_at, completed_at, category_id)
+        INSERT INTO todos (id, text, completed, pinned, created_at, completed_at, category_id)
         VALUES (
           ${todo.id},
           ${todo.text},
           ${todo.completed},
+          ${todo.pinned},
           ${todo.createdAt},
           ${todo.completedAt},
           ${todo.categoryId}
@@ -167,6 +170,7 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
         ON CONFLICT (id) DO UPDATE SET
           text = EXCLUDED.text,
           completed = EXCLUDED.completed,
+          pinned = EXCLUDED.pinned,
           completed_at = EXCLUDED.completed_at,
           category_id = EXCLUDED.category_id
       `;

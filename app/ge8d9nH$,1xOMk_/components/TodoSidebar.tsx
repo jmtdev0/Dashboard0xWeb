@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Todo, SortOption, FilterOption } from "@/lib/types/todo";
 
 interface TodoSidebarProps {
   token: string;
   isOpen: boolean;
   onToggle: () => void;
+}
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  todoId: string | null;
 }
 
 export default function TodoSidebar({
@@ -23,11 +30,32 @@ export default function TodoSidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [isFixingEncoding, setIsFixingEncoding] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    todoId: null,
+  });
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  // Load todos on mount
   useEffect(() => {
     loadTodos();
   }, [token]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+      }
+    };
+
+    if (contextMenu.visible) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [contextMenu.visible]);
 
   const loadTodos = async () => {
     try {
@@ -86,7 +114,6 @@ export default function TodoSidebar({
   };
 
   const handleToggleComplete = async (todo: Todo) => {
-    // Optimistic update
     const optimisticTodos = todos.map((t) =>
       t.id === todo.id
         ? {
@@ -112,14 +139,43 @@ export default function TodoSidebar({
       });
 
       if (!response.ok) {
-        // Revert on error
         setTodos(todos);
         setError("Failed to update todo");
       }
     } catch (err) {
-      // Revert on error
       setTodos(todos);
       setError("Failed to update todo");
+      console.error(err);
+    }
+  };
+
+  const handleTogglePin = async (todo: Todo) => {
+    const optimisticTodos = todos.map((t) =>
+      t.id === todo.id ? { ...t, pinned: !t.pinned } : t
+    );
+    setTodos(optimisticTodos);
+    setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+
+    try {
+      const response = await fetch("/api/todos", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: todo.id,
+          pinned: !todo.pinned,
+        }),
+      });
+
+      if (!response.ok) {
+        setTodos(todos);
+        setError("Failed to pin todo");
+      }
+    } catch (err) {
+      setTodos(todos);
+      setError("Failed to pin todo");
       console.error(err);
     }
   };
@@ -127,6 +183,7 @@ export default function TodoSidebar({
   const handleStartEdit = (todo: Todo) => {
     setEditingId(todo.id);
     setEditText(todo.text);
+    setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
   };
 
   const handleSaveEdit = async (todo: Todo) => {
@@ -169,9 +226,10 @@ export default function TodoSidebar({
   };
 
   const handleDelete = async (todo: Todo) => {
+    setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+
     if (!confirm("Delete this todo?")) return;
 
-    // Optimistic delete
     const optimisticTodos = todos.filter((t) => t.id !== todo.id);
     setTodos(optimisticTodos);
 
@@ -186,15 +244,43 @@ export default function TodoSidebar({
       });
 
       if (!response.ok) {
-        // Revert on error
         setTodos(todos);
         setError("Failed to delete todo");
       }
     } catch (err) {
-      // Revert on error
       setTodos(todos);
       setError("Failed to delete todo");
       console.error(err);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, todoId: string) => {
+    e.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      todoId,
+    });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, todoId: string) => {
+    const timer = setTimeout(() => {
+      const touch = e.touches[0];
+      setContextMenu({
+        visible: true,
+        x: touch.clientX,
+        y: touch.clientY,
+        todoId,
+      });
+    }, 500); // 500ms long press
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
     }
   };
 
@@ -217,7 +303,6 @@ export default function TodoSidebar({
       const result = await response.json();
 
       if (response.ok) {
-        // Reload todos to see the fixed data
         await loadTodos();
         alert(`✅ Fixed ${result.fixedCount} todos with encoding issues`);
       } else {
@@ -231,19 +316,21 @@ export default function TodoSidebar({
     }
   };
 
-  // Filter todos
   const filteredTodos = todos.filter((todo) => {
     if (filter === "active") return !todo.completed;
     if (filter === "completed") return todo.completed;
     return true;
   });
 
-  // Sort todos
   const sortedTodos = [...filteredTodos].sort((a, b) => {
+    // Always show pinned items first
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+
+    // Then sort by selected option
     if (sortBy === "createdAt") {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     } else {
-      // Sort by completion date
       if (!a.completedAt && !b.completedAt) return 0;
       if (!a.completedAt) return 1;
       if (!b.completedAt) return -1;
@@ -252,6 +339,8 @@ export default function TodoSidebar({
       );
     }
   });
+
+  const selectedTodo = todos.find((t) => t.id === contextMenu.todoId);
 
   return (
     <>
@@ -336,7 +425,7 @@ export default function TodoSidebar({
             </select>
           </div>
 
-          {/* Fix Encoding Button - Only show if there might be encoding issues */}
+          {/* Fix Encoding Button */}
           {todos.some(t => /├▒|├│|├ş|├í|├ę|├║|├ü|Ã±|Ã³|Ã¡|Ã©|Ã­|Ãº|Ã/.test(t.text)) && (
             <button
               onClick={handleFixEncoding}
@@ -369,6 +458,41 @@ export default function TodoSidebar({
           )}
         </div>
 
+        {/* Context Menu */}
+        {contextMenu.visible && selectedTodo && (
+          <div
+            ref={contextMenuRef}
+            className="fixed bg-white dark:bg-sky-800 border-2 border-sky-300 dark:border-sky-600 rounded-lg shadow-xl z-50 py-1 min-w-[180px]"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+          >
+            <button
+              onClick={() => handleTogglePin(selectedTodo)}
+              className="w-full px-4 py-2 text-left hover:bg-sky-100 dark:hover:bg-sky-700 text-slate-900 dark:text-sky-50 flex items-center gap-2 text-sm"
+            >
+              <span className="text-base">📌</span>
+              {selectedTodo.pinned ? "Unpin" : "Pin"}
+            </button>
+            <button
+              onClick={() => handleStartEdit(selectedTodo)}
+              className="w-full px-4 py-2 text-left hover:bg-sky-100 dark:hover:bg-sky-700 text-slate-900 dark:text-sky-50 flex items-center gap-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit
+            </button>
+            <button
+              onClick={() => handleDelete(selectedTodo)}
+              className="w-full px-4 py-2 text-left hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 flex items-center gap-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          </div>
+        )}
+
         {/* Todo List */}
         <div className="p-4 space-y-2">
           {loading && (
@@ -397,6 +521,10 @@ export default function TodoSidebar({
                   ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
                   : "bg-sky-50 dark:bg-sky-800/40 border-sky-200 dark:border-sky-700"
               }`}
+              onContextMenu={(e) => handleContextMenu(e, todo.id)}
+              onTouchStart={(e) => handleTouchStart(e, todo.id)}
+              onTouchEnd={handleTouchEnd}
+              onTouchMove={handleTouchEnd}
             >
               <div className="flex items-start gap-2">
                 {/* Checkbox */}
@@ -442,6 +570,7 @@ export default function TodoSidebar({
                             : "text-slate-900 dark:text-sky-50"
                         }`}
                       >
+                        {todo.pinned && <span className="mr-1">📌</span>}
                         {todo.text}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-slate-600 dark:text-sky-300">
@@ -458,47 +587,10 @@ export default function TodoSidebar({
                   )}
                 </div>
 
-                {/* Actions */}
+                {/* Actions - Hidden, use context menu instead */}
                 {editingId !== todo.id && (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleStartEdit(todo)}
-                      className="p-1 hover:bg-sky-200 dark:hover:bg-sky-700 rounded transition-colors"
-                      aria-label="Edit"
-                    >
-                      <svg
-                        className="w-4 h-4 text-slate-700 dark:text-sky-200"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(todo)}
-                      className="p-1 hover:bg-red-200 dark:hover:bg-red-900 rounded transition-colors"
-                      aria-label="Delete"
-                    >
-                      <svg
-                        className="w-4 h-4 text-red-600 dark:text-red-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    </button>
+                  <div className="opacity-0 pointer-events-none">
+                    {/* Placeholder for layout consistency */}
                   </div>
                 )}
               </div>

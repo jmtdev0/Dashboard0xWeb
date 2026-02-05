@@ -122,6 +122,7 @@ export async function POST(request: Request) {
       id: generateTodoId(),
       text: text.trim(),
       completed: false,
+      pinned: false,
       createdAt: new Date().toISOString(),
       completedAt: null,
       categoryId: categoryId !== undefined ? categoryId : null,
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
 
 /**
  * PUT /api/todos - Update existing todo
- * Body: { id: string, text?: string, completed?: boolean }
+ * Body: { id: string, text?: string, completed?: boolean, pinned?: boolean }
  * Requires valid Authorization token
  */
 export async function PUT(request: Request) {
@@ -154,7 +155,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const { id, text, completed, categoryId } = await request.json();
+    const { id, text, completed, pinned, categoryId } = await request.json();
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
@@ -193,6 +194,7 @@ export async function PUT(request: Request) {
         completed,
         completedAt: completed ? new Date().toISOString() : null,
       }),
+      ...(pinned !== undefined && { pinned }),
       ...(categoryId !== undefined && { categoryId }),
     };
 

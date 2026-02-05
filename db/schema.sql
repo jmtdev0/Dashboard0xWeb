@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS todos (
   id VARCHAR(50) PRIMARY KEY,
   text TEXT NOT NULL CHECK (LENGTH(text) >= 1 AND LENGTH(text) <= 500),
   completed BOOLEAN NOT NULL DEFAULT FALSE,
+  pinned BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
   completed_at TIMESTAMP WITH TIME ZONE,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -21,6 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_dashboard_updated ON dashboard(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_todos_created ON todos(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_todos_completed ON todos(completed);
 CREATE INDEX IF NOT EXISTS idx_todos_completed_at ON todos(completed_at DESC) WHERE completed_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_todos_pinned ON todos(pinned DESC, created_at DESC);
 
 -- Solo queremos 1 registro en dashboard (latest data)
 -- Crear una función trigger para mantener solo el más reciente
