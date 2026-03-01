@@ -23,7 +23,7 @@ export default function PrivatePage() {
         if (data.valid && data.token) {
           console.log("✅ Valid auth cookie found, skipping login");
           setToken(data.token);
-          setCurrentView("selection");
+          setCurrentView("todos");
         } else {
           console.log("❌ No valid auth cookie found, showing login");
         }
@@ -39,7 +39,7 @@ export default function PrivatePage() {
 
   const handleLoginSuccess = (newToken: string) => {
     setToken(newToken);
-    setCurrentView("selection");
+    setCurrentView("todos");
   };
 
   const handleSelectCrypto = () => {
