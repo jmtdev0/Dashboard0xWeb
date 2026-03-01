@@ -18,7 +18,7 @@ interface CategoryTree extends Category {
 interface CategoryFilterProps {
   token: string;
   selectedCategoryId: string | null;
-  onFilterChange: (categoryId: string | null) => void;
+  onFilterChange: (categoryId: string | null, descendantIds: string[]) => void;
 }
 
 export default function CategoryFilter({
@@ -112,7 +112,16 @@ export default function CategoryFilter({
       </label>
       <select
         value={selectedCategoryId || ""}
-        onChange={(e) => onFilterChange(e.target.value || null)}
+        onChange={(e) => {
+          const val = e.target.value || null;
+          if (!val) {
+            onFilterChange(null, []);
+          } else if (val === "uncategorized") {
+            onFilterChange("uncategorized", []);
+          } else {
+            onFilterChange(val, getAllDescendantIds(val));
+          }
+        }}
         className="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
       >
         <option value="">All Categories</option>

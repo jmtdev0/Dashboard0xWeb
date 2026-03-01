@@ -32,6 +32,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [categoryFilterIds, setCategoryFilterIds] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -39,11 +40,41 @@ export default function TodoManager({ token }: TodoManagerProps) {
     todoId: null,
   });
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [categoriesList, setCategoriesList] = useState<Array<{ id: string; name: string; parentId: string | null }>>([]);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadTodos();
+    loadCategoriesList();
   }, [token]);
+
+  const loadCategoriesList = async () => {
+    try {
+      const response = await fetch("/api/categories?flat=true", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const cats = await response.json();
+        setCategoriesList(cats);
+      }
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    }
+  };
+
+  const getCategoryBreadcrumb = (categoryId: string | null): string | null => {
+    if (!categoryId || categoriesList.length === 0) return null;
+    const buildPath = (id: string): string | null => {
+      const cat = categoriesList.find((c) => c.id === id);
+      if (!cat) return null;
+      if (cat.parentId) {
+        const parentPath = buildPath(cat.parentId);
+        return parentPath ? `${parentPath} > ${cat.name}` : cat.name;
+      }
+      return cat.name;
+    };
+    return buildPath(categoryId);
+  };
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -330,6 +361,9 @@ export default function TodoManager({ token }: TodoManagerProps) {
     }
   };
 
+  const activeTodosCount = todos.filter((t) => !t.completed).length;
+  const completedTodosCount = todos.filter((t) => t.completed).length;
+
   const filteredTodos = todos.filter((todo) => {
     // Filter by completion status
     if (filter === "active" && todo.completed) return false;
@@ -339,8 +373,8 @@ export default function TodoManager({ token }: TodoManagerProps) {
     if (categoryFilter === "uncategorized") {
       return todo.categoryId === null;
     }
-    if (categoryFilter) {
-      return todo.categoryId === categoryFilter;
+    if (categoryFilter && categoryFilterIds.length > 0) {
+      return categoryFilterIds.includes(todo.categoryId ?? "");
     }
 
     return true;
@@ -439,7 +473,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
           />
           <button
             type="submit"
-            disabled={!newTodoText.trim() || todos.length >= 200 || isAddingTodo}
+            disabled={!newTodoText.trim() || activeTodosCount >= 200 || isAddingTodo}
             className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isAddingTodo ? (
@@ -466,7 +500,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
                 Adding...
               </>
             ) : (
-              `Add Todo (${todos.length}/200)`
+              `Add Todo (${activeTodosCount}/200)`
             )}
           </button>
         </form>
@@ -476,22 +510,50 @@ export default function TodoManager({ token }: TodoManagerProps) {
           <CategoryFilter
             token={token}
             selectedCategoryId={categoryFilter}
-            onFilterChange={setCategoryFilter}
+            onFilterChange={(categoryId, descendantIds) => {
+              setCategoryFilter(categoryId);
+              setCategoryFilterIds(descendantIds);
+            }}
           />
+        </div>
+
+        {/* Status Tabs */}
+        <div className="flex border-b-2 border-sky-200 dark:border-sky-700 mb-4">
+          <button
+            onClick={() => setFilter("active")}
+            className={`flex-1 py-3 font-semibold transition-colors text-sm sm:text-base ${
+              filter === "active"
+                ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            Active ({activeTodosCount})
+          </button>
+          <button
+            onClick={() => setFilter("completed")}
+            className={`flex-1 py-3 font-semibold transition-colors text-sm sm:text-base ${
+              filter === "completed"
+                ? "border-b-2 border-green-500 text-green-600 dark:text-green-400"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            Completed ({completedTodosCount})
+          </button>
+          <button
+            onClick={() => setFilter("all")}
+            className={`flex-1 py-3 font-semibold transition-colors text-sm sm:text-base ${
+              filter === "all"
+                ? "border-b-2 border-purple-500 text-purple-600 dark:text-purple-400"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            All ({todos.length})
+          </button>
         </div>
 
         {/* Filters and Actions */}
         <div className="flex flex-col gap-3 mb-4">
           <div className="flex flex-col sm:flex-row gap-3">
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as FilterOption)}
-              className="flex-1 px-4 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
-            >
-              <option value="active">Active</option>
-              <option value="all">All Todos</option>
-              <option value="completed">Completed</option>
-            </select>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -768,6 +830,14 @@ export default function TodoManager({ token }: TodoManagerProps) {
                       {todo.completedAt && (
                         <span>
                           Done: {new Date(todo.completedAt).toLocaleString()}
+                        </span>
+                      )}
+                      {todo.categoryId && getCategoryBreadcrumb(todo.categoryId) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                          </svg>
+                          {getCategoryBreadcrumb(todo.categoryId)}
                         </span>
                       )}
                     </div>

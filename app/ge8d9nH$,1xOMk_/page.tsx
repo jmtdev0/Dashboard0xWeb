@@ -5,8 +5,9 @@ import LoginForm from "./components/LoginForm";
 import SelectionScreen from "./components/SelectionScreen";
 import CryptoView from "./components/CryptoView";
 import TodoView from "./components/TodoView";
+import CalendarView from "./components/CalendarView";
 
-type View = "login" | "selection" | "crypto" | "todos";
+type View = "login" | "selection" | "crypto" | "todos" | "calendar";
 
 export default function PrivatePage() {
   const [token, setToken] = useState<string | null>(null);
@@ -50,6 +51,10 @@ export default function PrivatePage() {
     setCurrentView("todos");
   };
 
+  const handleSelectCalendar = () => {
+    setCurrentView("calendar");
+  };
+
   const handleBackToSelection = () => {
     setCurrentView("selection");
   };
@@ -77,6 +82,7 @@ export default function PrivatePage() {
       <SelectionScreen
         onSelectCrypto={handleSelectCrypto}
         onSelectTodos={handleSelectTodos}
+        onSelectCalendar={handleSelectCalendar}
       />
     );
   }
@@ -87,6 +93,10 @@ export default function PrivatePage() {
 
   if (currentView === "todos") {
     return <TodoView token={token} onBack={handleBackToSelection} />;
+  }
+
+  if (currentView === "calendar") {
+    return <CalendarView token={token} onBack={handleBackToSelection} />;
   }
 
   return null;

@@ -1,17 +1,16 @@
 "use client";
 
-import TodoManager from "./TodoManager";
+import CalendarManager from "./CalendarManager";
 
-interface TodoViewProps {
+interface CalendarViewProps {
   token: string;
   onBack: () => void;
 }
 
-export default function TodoView({ token, onBack }: TodoViewProps) {
+export default function CalendarView({ token, onBack }: CalendarViewProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-300 via-sky-200 to-blue-100 dark:from-sky-900 dark:to-blue-800">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
         <header className="mb-8">
           <div className="flex items-center gap-4">
             <button
@@ -36,13 +35,12 @@ export default function TodoView({ token, onBack }: TodoViewProps) {
             </button>
 
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-sky-50">
-              TODO Manager
+              Calendar
             </h1>
           </div>
         </header>
 
-        {/* Todo Manager */}
-        <TodoManager token={token} />
+        <CalendarManager token={token} />
       </div>
     </div>
   );

@@ -110,10 +110,11 @@ export async function POST(request: Request) {
 
     const { todos } = await getAllTodos();
 
-    // Enforce max 200 todos limit
-    if (todos.length >= 200) {
+    // Enforce max 200 active todos limit (completed don't count)
+    const activeTodosCount = todos.filter((t) => !t.completed).length;
+    if (activeTodosCount >= 200) {
       return NextResponse.json(
-        { error: "Maximum todo limit reached (200)" },
+        { error: "Maximum active todo limit reached (200)" },
         { status: 400 }
       );
     }
