@@ -216,6 +216,66 @@ export default function CalendarManager({ token }: CalendarManagerProps) {
     setCurrentMonth(new Date());
   };
 
+  const sortedEventsForExport = [...events].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const handleExportJSON = () => {
+    const dataStr = JSON.stringify(sortedEventsForExport, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `events-${new Date().toISOString().split("T")[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCSV = () => {
+    const headers = ["ID", "Title", "Date", "Description", "Created At"];
+    const rows = sortedEventsForExport.map((evt) => [
+      evt.id,
+      `"${evt.title.replace(/"/g, '""')}"`,
+      new Date(evt.date).toISOString(),
+      evt.description ? `"${evt.description.replace(/"/g, '""')}"` : "",
+      evt.createdAt,
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.join(",")),
+    ].join("\n");
+
+    const dataBlob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `events-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyToClipboard = () => {
+    const text = sortedEventsForExport
+      .map((evt) => {
+        const dateStr = new Date(evt.date).toLocaleDateString("en-US", {
+          weekday: "short",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+        return evt.description
+          ? `📅 ${evt.title} — ${dateStr} (${evt.description})`
+          : `📅 ${evt.title} — ${dateStr}`;
+      })
+      .join("\n");
+
+    navigator.clipboard.writeText(text).then(
+      () => alert("✅ Copied to clipboard!"),
+      () => setError("Failed to copy to clipboard")
+    );
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto">
       {/* Add Event Form */}
@@ -307,12 +367,45 @@ export default function CalendarManager({ token }: CalendarManagerProps) {
           </button>
         </div>
 
-        {/* Refresh button */}
-        <div className="flex justify-end mb-4">
+        {/* Actions row: Export + Refresh */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <button
+            onClick={handleExportJSON}
+            disabled={events.length === 0}
+            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            title="Export events as JSON"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Export JSON</span>
+          </button>
+          <button
+            onClick={handleExportCSV}
+            disabled={events.length === 0}
+            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            title="Export events as CSV"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={handleCopyToClipboard}
+            disabled={events.length === 0}
+            className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            title="Copy events to clipboard"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Copy</span>
+          </button>
           <button
             onClick={loadEvents}
             disabled={loading}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
             title="Refresh events"
           >
             <svg
