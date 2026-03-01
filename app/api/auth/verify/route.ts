@@ -54,8 +54,8 @@ export async function POST(request: Request) {
       expiresAt,
     });
 
-    // Set HTTP-only cookie that expires in 24 hours for web
-    const cookieExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Set HTTP-only cookie that expires in 7 days for web
+    const cookieExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     response.cookies.set("auth_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
