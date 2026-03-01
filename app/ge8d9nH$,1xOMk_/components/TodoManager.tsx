@@ -464,6 +464,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
             onChange={(e) => setNewTodoText(e.target.value)}
             placeholder="Add new todo..."
             maxLength={500}
+            autoFocus
             className="w-full px-4 py-3 border-2 border-sky-300 dark:border-sky-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-sky-800/50 dark:text-sky-50"
           />
           <CategorySelector
