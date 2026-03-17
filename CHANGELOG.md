@@ -2,6 +2,7 @@
 
 ### 17/03/2026
 * Added `GET /api/todos/export` endpoint — returns the full TODO list as JSON, authorized via `Authorization: Bearer <password>` (bcrypt-verified against `PRIVATE_PASSWORD_HASH`)
+* Fixed public dashboard always showing "Error" on all services: replaced `puppeteer` full bundle with `puppeteer-core` + `@sparticuz/chromium` for serverless compatibility; decoupled GitHub (fetch-only) from browser tests; fixed catch block to propagate browser launch errors into each service result
 
 ### 01/03/2026
 * Added Calendar section accessible from the bifurcation screen (events with title, date, description; month grid view and upcoming events view)

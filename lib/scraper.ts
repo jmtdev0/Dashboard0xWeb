@@ -1,5 +1,4 @@
-import puppeteer from "puppeteer";
-import type { Browser, Page } from "puppeteer";
+import type { Browser, Page } from "puppeteer-core";
 import path from "path";
 
 export interface TestResult {
@@ -57,18 +56,42 @@ export interface ExtensionResult {
   error?: string;
 }
 
+const SERVERLESS_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-blink-features=AutomationControlled",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--single-process",
+  "--window-size=1920,1080",
+];
+
+/**
+ * Returns a Puppeteer Browser instance.
+ * - In Netlify/AWS Lambda: uses puppeteer-core + @sparticuz/chromium (no bundled binary needed).
+ * - In local dev: uses the full puppeteer package with its bundled Chromium.
+ */
 async function getBrowser(): Promise<Browser> {
-  // Use puppeteer's bundled Chromium 
-  // New headless mode is now the default in Puppeteer v22+
+  const isServerless = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+  if (isServerless) {
+    console.log("🚀 [BROWSER] Serverless environment detected — using @sparticuz/chromium");
+    const chromium = (await import("@sparticuz/chromium")).default;
+    const puppeteerCore = (await import("puppeteer-core")).default;
+
+    return puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    });
+  }
+
+  console.log("🖥️ [BROWSER] Local environment — using full puppeteer");
+  const puppeteer = (await import("puppeteer")).default;
   return puppeteer.launch({
     headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-blink-features=AutomationControlled",
-      "--disable-dev-shm-usage",
-      "--window-size=1920,1080",
-    ],
+    args: SERVERLESS_ARGS,
     defaultViewport: { width: 1920, height: 1080 },
   });
 }
@@ -88,42 +111,61 @@ export async function runAllTests(): Promise<TestResult> {
 
   let browser: Browser | null = null;
 
+  // GitHub uses fetch only — run it independently so a browser crash can't kill it.
+  // Crypto also uses fetch only.
+  const [github, crypto] = await Promise.allSettled([
+    testGitHub(),
+    testCryptoPrices(),
+  ]);
+
+  if (github.status === "fulfilled") {
+    results.results.github = github.value;
+  } else {
+    results.results.github = { success: false, error: github.reason?.message ?? "Unknown error" };
+  }
+
+  if (crypto.status === "fulfilled") {
+    results.results.crypto = crypto.value;
+    console.log("✅ [SCRAPER] Crypto promise fulfilled:", crypto.value);
+  } else {
+    console.error("❌ [SCRAPER] Crypto promise rejected:", crypto.reason);
+    results.results.crypto = {
+      success: false,
+      error: `Crypto error: ${crypto.reason?.message ?? "Unknown error"}`,
+    };
+  }
+
   try {
     browser = await getBrowser();
 
-    // Run tests in parallel where possible
-    const [youtube, twitter, instagram, github, crypto, extensions] =
+    // Run browser-dependent tests in parallel
+    const [youtube, twitter, instagram, extensions] =
       await Promise.allSettled([
         testYouTube(browser),
         testTwitter(browser),
         testInstagram(browser),
-        testGitHub(browser),
-        testCryptoPrices(),
         testExtensions(browser),
       ]);
 
     if (youtube.status === "fulfilled") results.results.youtube = youtube.value;
+    else results.results.youtube = { success: false, error: youtube.reason?.message ?? "Unknown error" };
     if (twitter.status === "fulfilled") results.results.twitter = twitter.value;
+    else results.results.twitter = { success: false, error: twitter.reason?.message ?? "Unknown error" };
     if (instagram.status === "fulfilled")
       results.results.instagram = instagram.value;
-    if (github.status === "fulfilled") results.results.github = github.value;
-
-    // Handle crypto result - always store something, even if promise rejected
-    if (crypto.status === "fulfilled") {
-      results.results.crypto = crypto.value;
-      console.log("✅ [SCRAPER] Crypto promise fulfilled:", crypto.value);
-    } else {
-      console.error("❌ [SCRAPER] Crypto promise rejected:", crypto.reason);
-      results.results.crypto = {
-        success: false,
-        error: `Crypto scraper failed: ${crypto.reason?.message || 'Unknown error'}`,
-      };
-    }
+    else results.results.instagram = { success: false, error: instagram.reason?.message ?? "Unknown error" };
 
     if (extensions.status === "fulfilled")
       results.results.extensions = extensions.value;
   } catch (error) {
-    console.error("Fatal error in runAllTests:", error);
+    const msg = error instanceof Error ? error.message : "Unknown browser error";
+    console.error("❌ [SCRAPER] Browser launch/test error:", msg);
+    // Propagate the browser error into every browser-dependent service
+    // so the frontend can show what actually went wrong.
+    const browserError = { success: false as const, error: `Browser error: ${msg}` };
+    if (!results.results.youtube.error) results.results.youtube = browserError;
+    if (!results.results.twitter.error) results.results.twitter = browserError;
+    if (!results.results.instagram.error) results.results.instagram = browserError;
   } finally {
     if (browser) {
       await browser.close();
@@ -351,7 +393,7 @@ async function testInstagram(browser: Browser): Promise<InstagramResult> {
   }
 }
 
-async function testGitHub(browser: Browser): Promise<GithubResult> {
+async function testGitHub(): Promise<GithubResult> {
   // Use GitHub API directly - more reliable than scraping
   try {
     console.log("Testing GitHub KingdomHeartsCustomMusic via API...");
