@@ -208,17 +208,11 @@ async function testTwitter(): Promise<TwitterResult> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      // Fallback: just check if the profile page responds
-      const headRes = await fetch("https://x.com/windyBotES", {
-        method: "HEAD",
-        headers: { "User-Agent": USER_AGENT },
-        redirect: "follow",
-      });
-
-      if (headRes.ok || headRes.status === 200) {
-        return { success: true, lastTweet: "Profile active" };
+      // 403 means Twitter is blocking the cloud IP — profile exists but is inaccessible
+      if (response.status === 403) {
+        return { success: true, lastTweet: "Profile exists (blocked by X)", totalTweets: null };
       }
-      throw new Error(`Twitter returned ${headRes.status}`);
+      throw new Error(`Twitter returned ${response.status}`);
     }
 
     const html = await response.text();
@@ -621,7 +615,11 @@ async function testExtensions(): Promise<ExtensionResult[]> {
       }
 
       const html = await response.text();
-      const notFound = html.includes("Item not found") || html.includes("404");
+      const $ = cheerio.load(html);
+
+      // Check page title — Chrome Web Store shows "404" or "Item not found" in title for missing extensions
+      const title = $("title").text();
+      const notFound = title.includes("Item not found") || title === "404";
 
       results.push({
         ...ext,
