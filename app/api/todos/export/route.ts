@@ -55,9 +55,10 @@ export async function GET(request: Request) {
 
     console.log("✅ [TODOS EXPORT] Password valid, fetching todos...");
     const data = await getAllTodos();
-    console.log("📦 [TODOS EXPORT] Returning", data.todos.length, "todos");
+    const pendingTodos = data.todos.filter((todo) => !todo.completed);
+    console.log("📦 [TODOS EXPORT] Returning", pendingTodos.length, "pending todos (out of", data.todos.length, "total)");
 
-    return NextResponse.json(data, {
+    return NextResponse.json({ todos: pendingTodos, lastModified: data.lastModified }, {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
       },
