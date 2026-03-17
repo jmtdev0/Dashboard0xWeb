@@ -9,6 +9,7 @@
   - Extensions: checks Chrome Web Store availability via HTML title
   - Removed `puppeteer`, `puppeteer-core`, `@sparticuz/chromium` (84 packages, ~64MB saved)
 * All 6 dashboard services now return `success: true` on Netlify serverless
+* Added BeTheCandle indicator — fetches total USDC distributed from `bethecandle.live/api/community-pot/history`
 
 ### 01/03/2026
 * Added Calendar section accessible from the bifurcation screen (events with title, date, description; month grid view and upcoming events view)
