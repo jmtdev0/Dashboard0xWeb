@@ -12,7 +12,7 @@ export interface TestResult {
     github: GithubResult;
     crypto: CryptoResult;
     extensions: ExtensionResult[];
-    bethecandle: BeTheCandleResult;
+    bethecandle?: BeTheCandleResult;
   };
 }
 

@@ -291,16 +291,16 @@ export default function Dashboard() {
             <ServiceCard
               title="Be The Candle"
               icon="🕯️"
-              status={data.results.bethecandle.success}
+              status={data.results.bethecandle?.success ?? false}
               data={[
                 {
                   label: "Total Distributed",
-                  value: data.results.bethecandle.totalDistributed != null
+                  value: data.results.bethecandle?.totalDistributed != null
                     ? `$${data.results.bethecandle.totalDistributed.toFixed(2)} USDC`
                     : "N/A",
                 },
               ]}
-              error={data.results.bethecandle.error}
+              error={data.results.bethecandle?.error}
               link="https://bethecandle.live/history"
             />
           </div>
