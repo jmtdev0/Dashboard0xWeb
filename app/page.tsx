@@ -286,6 +286,23 @@ export default function Dashboard() {
                 link={`https://chromewebstore.google.com/detail/${ext.extensionId}`}
               />
             ))}
+
+            {/* BeTheCandle Card */}
+            <ServiceCard
+              title="Be The Candle"
+              icon="🕯️"
+              status={data.results.bethecandle.success}
+              data={[
+                {
+                  label: "Total Distributed",
+                  value: data.results.bethecandle.totalDistributed != null
+                    ? `$${data.results.bethecandle.totalDistributed.toFixed(2)} USDC`
+                    : "N/A",
+                },
+              ]}
+              error={data.results.bethecandle.error}
+              link="https://bethecandle.live/history"
+            />
           </div>
         )}
 

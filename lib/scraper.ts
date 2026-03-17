@@ -12,6 +12,7 @@ export interface TestResult {
     github: GithubResult;
     crypto: CryptoResult;
     extensions: ExtensionResult[];
+    bethecandle: BeTheCandleResult;
   };
 }
 
@@ -58,6 +59,12 @@ export interface ExtensionResult {
   error?: string;
 }
 
+export interface BeTheCandleResult {
+  success: boolean;
+  totalDistributed?: number;
+  error?: string;
+}
+
 export async function runAllTests(): Promise<TestResult> {
   const results: TestResult = {
     timestamp: new Date().toISOString(),
@@ -68,11 +75,12 @@ export async function runAllTests(): Promise<TestResult> {
       github: { success: false },
       crypto: { success: false },
       extensions: [],
+      bethecandle: { success: false },
     },
   };
 
   // All tests use fetch — run them all in parallel
-  const [youtube, twitter, instagram, github, crypto, extensions] =
+  const [youtube, twitter, instagram, github, crypto, extensions, bethecandle] =
     await Promise.allSettled([
       testYouTube(),
       testTwitter(),
@@ -80,6 +88,7 @@ export async function runAllTests(): Promise<TestResult> {
       testGitHub(),
       testCryptoPrices(),
       testExtensions(),
+      testBeTheCandle(),
     ]);
 
   results.results.youtube =
@@ -102,6 +111,8 @@ export async function runAllTests(): Promise<TestResult> {
 
   results.results.extensions =
     extensions.status === "fulfilled" ? extensions.value : [];
+  results.results.bethecandle =
+    bethecandle.status === "fulfilled" ? bethecandle.value : { success: false, error: bethecandle.reason?.message ?? "Unknown error" };
 
   return results;
 }
@@ -637,4 +648,45 @@ async function testExtensions(): Promise<ExtensionResult[]> {
   }
 
   return results;
+}
+
+/**
+ * BeTheCandle: Fetch total distributed USDC from the community-pot history API.
+ */
+async function testBeTheCandle(): Promise<BeTheCandleResult> {
+  try {
+    console.log("Testing BeTheCandle community pot history...");
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(
+      "https://bethecandle.live/api/community-pot/history",
+      {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`bethecandle API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    const payouts: Array<{ total_amount_usdc: string }> = data.payouts ?? [];
+
+    const total = payouts.reduce(
+      (sum, p) => sum + parseFloat(p.total_amount_usdc),
+      0
+    );
+
+    return { success: true, totalDistributed: parseFloat(total.toFixed(2)) };
+  } catch (error) {
+    console.error("BeTheCandle test failed:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }
