@@ -1,8 +1,14 @@
 # CHANGELOG
 
 ### 17/03/2026
-* Added `GET /api/todos/export` endpoint — returns the full TODO list as JSON, authorized via `Authorization: Bearer <password>` (bcrypt-verified against `PRIVATE_PASSWORD_HASH`)
-* Fixed public dashboard always showing "Error" on all services: replaced `puppeteer` full bundle with `puppeteer-core` + `@sparticuz/chromium` for serverless compatibility; decoupled GitHub (fetch-only) from browser tests; fixed catch block to propagate browser launch errors into each service result
+* Added `GET /api/todos/export` endpoint — returns pending TODOs as JSON, authorized via `Authorization: Bearer <password>`
+* Fixed public dashboard: replaced all Puppeteer-based scrapers with `fetch` + `cheerio` (no headless browser needed)
+  - YouTube: extracts channel ID from HTML, fetches RSS feed for latest video date
+  - Twitter: uses syndication API with graceful degradation for 403/429 blocks
+  - Instagram: parses `og:description` meta tag
+  - Extensions: checks Chrome Web Store availability via HTML title
+  - Removed `puppeteer`, `puppeteer-core`, `@sparticuz/chromium` (84 packages, ~64MB saved)
+* All 6 dashboard services now return `success: true` on Netlify serverless
 
 ### 01/03/2026
 * Added Calendar section accessible from the bifurcation screen (events with title, date, description; month grid view and upcoming events view)
