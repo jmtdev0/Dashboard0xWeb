@@ -208,8 +208,8 @@ async function testTwitter(): Promise<TwitterResult> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      // 403 means Twitter is blocking the cloud IP — profile exists but is inaccessible
-      if (response.status === 403) {
+      // 403/429 means Twitter is blocking the cloud IP or rate-limiting — profile likely exists
+      if (response.status === 403 || response.status === 429) {
         return { success: true, lastTweet: "Profile exists (blocked by X)", totalTweets: null };
       }
       throw new Error(`Twitter returned ${response.status}`);
