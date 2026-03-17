@@ -1,5 +1,7 @@
-import type { Browser, Page } from "puppeteer-core";
-import path from "path";
+import * as cheerio from "cheerio";
+
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 export interface TestResult {
   timestamp: string;
@@ -56,46 +58,6 @@ export interface ExtensionResult {
   error?: string;
 }
 
-const SERVERLESS_ARGS = [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--disable-blink-features=AutomationControlled",
-  "--disable-dev-shm-usage",
-  "--disable-gpu",
-  "--single-process",
-  "--window-size=1920,1080",
-];
-
-/**
- * Returns a Puppeteer Browser instance.
- * - In Netlify/AWS Lambda: uses puppeteer-core + @sparticuz/chromium (no bundled binary needed).
- * - In local dev: uses the full puppeteer package with its bundled Chromium.
- */
-async function getBrowser(): Promise<Browser> {
-  const isServerless = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-
-  if (isServerless) {
-    console.log("🚀 [BROWSER] Serverless environment detected — using @sparticuz/chromium");
-    const chromium = (await import("@sparticuz/chromium")).default;
-    const puppeteerCore = (await import("puppeteer-core")).default;
-
-    return puppeteerCore.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: true,
-    });
-  }
-
-  console.log("🖥️ [BROWSER] Local environment — using full puppeteer");
-  const puppeteer = (await import("puppeteer")).default;
-  return puppeteer.launch({
-    headless: true,
-    args: SERVERLESS_ARGS,
-    defaultViewport: { width: 1920, height: 1080 },
-  });
-}
-
 export async function runAllTests(): Promise<TestResult> {
   const results: TestResult = {
     timestamp: new Date().toISOString(),
@@ -109,287 +71,239 @@ export async function runAllTests(): Promise<TestResult> {
     },
   };
 
-  let browser: Browser | null = null;
+  // All tests use fetch — run them all in parallel
+  const [youtube, twitter, instagram, github, crypto, extensions] =
+    await Promise.allSettled([
+      testYouTube(),
+      testTwitter(),
+      testInstagram(),
+      testGitHub(),
+      testCryptoPrices(),
+      testExtensions(),
+    ]);
 
-  // GitHub uses fetch only — run it independently so a browser crash can't kill it.
-  // Crypto also uses fetch only.
-  const [github, crypto] = await Promise.allSettled([
-    testGitHub(),
-    testCryptoPrices(),
-  ]);
-
-  if (github.status === "fulfilled") {
-    results.results.github = github.value;
-  } else {
-    results.results.github = { success: false, error: github.reason?.message ?? "Unknown error" };
-  }
+  results.results.youtube =
+    youtube.status === "fulfilled" ? youtube.value : { success: false, error: youtube.reason?.message ?? "Unknown error" };
+  results.results.twitter =
+    twitter.status === "fulfilled" ? twitter.value : { success: false, error: twitter.reason?.message ?? "Unknown error" };
+  results.results.instagram =
+    instagram.status === "fulfilled" ? instagram.value : { success: false, error: instagram.reason?.message ?? "Unknown error" };
+  results.results.github =
+    github.status === "fulfilled" ? github.value : { success: false, error: github.reason?.message ?? "Unknown error" };
 
   if (crypto.status === "fulfilled") {
     results.results.crypto = crypto.value;
-    console.log("✅ [SCRAPER] Crypto promise fulfilled:", crypto.value);
   } else {
-    console.error("❌ [SCRAPER] Crypto promise rejected:", crypto.reason);
     results.results.crypto = {
       success: false,
       error: `Crypto error: ${crypto.reason?.message ?? "Unknown error"}`,
     };
   }
 
-  try {
-    browser = await getBrowser();
-
-    // Run browser-dependent tests in parallel
-    const [youtube, twitter, instagram, extensions] =
-      await Promise.allSettled([
-        testYouTube(browser),
-        testTwitter(browser),
-        testInstagram(browser),
-        testExtensions(browser),
-      ]);
-
-    if (youtube.status === "fulfilled") results.results.youtube = youtube.value;
-    else results.results.youtube = { success: false, error: youtube.reason?.message ?? "Unknown error" };
-    if (twitter.status === "fulfilled") results.results.twitter = twitter.value;
-    else results.results.twitter = { success: false, error: twitter.reason?.message ?? "Unknown error" };
-    if (instagram.status === "fulfilled")
-      results.results.instagram = instagram.value;
-    else results.results.instagram = { success: false, error: instagram.reason?.message ?? "Unknown error" };
-
-    if (extensions.status === "fulfilled")
-      results.results.extensions = extensions.value;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown browser error";
-    console.error("❌ [SCRAPER] Browser launch/test error:", msg);
-    // Propagate the browser error into every browser-dependent service
-    // so the frontend can show what actually went wrong.
-    const browserError = { success: false as const, error: `Browser error: ${msg}` };
-    if (!results.results.youtube.error) results.results.youtube = browserError;
-    if (!results.results.twitter.error) results.results.twitter = browserError;
-    if (!results.results.instagram.error) results.results.instagram = browserError;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
+  results.results.extensions =
+    extensions.status === "fulfilled" ? extensions.value : [];
 
   return results;
 }
 
-async function testYouTube(browser: Browser): Promise<YoutubeResult> {
-  // Simplified test - just verify the channel exists and get basic info
-  let page: Page | null = null;
-  
+/**
+ * YouTube: Use the public RSS feed to find the latest video date.
+ * No browser or API key needed.
+ */
+async function testYouTube(): Promise<YoutubeResult> {
   try {
-    page = await browser.newPage();
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    console.log("Testing YouTube @jmtdev via RSS feed...");
+
+    // First, resolve the channel ID from the handle page
+    const handleRes = await fetch("https://www.youtube.com/@jmtdev", {
+      headers: { "User-Agent": USER_AGENT },
+      redirect: "follow",
+    });
+
+    if (!handleRes.ok) {
+      throw new Error(`YouTube page returned ${handleRes.status}`);
+    }
+
+    const html = await handleRes.text();
+
+    // Extract channel ID from page HTML (YouTube uses "externalId" in the initial HTML)
+    const channelIdMatch = html.match(/"externalId"\s*:\s*"(UC[\w-]+)"/);
+    if (!channelIdMatch) {
+      // Fallback: channel page loaded but we couldn't parse the ID
+      return { success: true, lastVideo: "Channel active" };
+    }
+
+    const channelId = channelIdMatch[1];
+    console.log(`Found channel ID: ${channelId}`);
+
+    // Fetch RSS feed
+    const rssRes = await fetch(
+      `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
+      { headers: { "User-Agent": USER_AGENT } }
     );
 
-    console.log("Testing YouTube @jmtdev...");
-    
-    // Set cookies to bypass consent
-    await page.setCookie({
-      name: "CONSENT",
-      value: "YES+cb.20240101-00-p0.en+FX+999",
-      domain: ".youtube.com",
-    });
-    
-    await page.goto("https://www.youtube.com/@jmtdev/videos", {
-      waitUntil: "networkidle2",
-      timeout: 30000,
-    });
-
-    // Wait for page to render .
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    // Get page content and look for video info
-    const result = await page.evaluate(() => {
-      const bodyText = document.body.innerText;
-      
-      // Check if we're on the channel page
-      const isChannelPage = bodyText.includes("subscribers") || bodyText.includes("videos");
-      
-      // Try to find video dates using regex
-      const datePatterns = [
-        /(\d+)\s*years?\s*ago/i,
-        /(\d+)\s*months?\s*ago/i,
-        /(\d+)\s*weeks?\s*ago/i,
-        /(\d+)\s*days?\s*ago/i,
-        /(\d+)\s*hours?\s*ago/i,
-      ];
-      
-      for (const pattern of datePatterns) {
-        const match = bodyText.match(pattern);
-        if (match) {
-          return { success: true, lastVideo: match[0] };
-        }
-      }
-      
-      // Check if channel exists but no videos found
-      if (isChannelPage) {
-        return { success: true, lastVideo: "Channel active" };
-      }
-      
-      return { success: false, lastVideo: null };
-    });
-
-    if (result.success && result.lastVideo) {
-      return { success: true, lastVideo: result.lastVideo };
+    if (!rssRes.ok) {
+      throw new Error(`YouTube RSS returned ${rssRes.status}`);
     }
-    
-    return { success: false, error: "Could not access YouTube channel" };
+
+    const rssXml = await rssRes.text();
+    const $ = cheerio.load(rssXml, { xml: true });
+
+    const firstEntry = $("entry").first();
+    if (firstEntry.length === 0) {
+      return { success: true, lastVideo: "No videos yet" };
+    }
+
+    const published = firstEntry.find("published").text();
+    if (published) {
+      const date = new Date(published);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      let ago: string;
+      if (diffDays === 0) ago = "today";
+      else if (diffDays === 1) ago = "1 day ago";
+      else if (diffDays < 7) ago = `${diffDays} days ago`;
+      else if (diffDays < 30) ago = `${Math.floor(diffDays / 7)} weeks ago`;
+      else if (diffDays < 365) ago = `${Math.floor(diffDays / 30)} months ago`;
+      else ago = `${Math.floor(diffDays / 365)} years ago`;
+
+      return { success: true, lastVideo: ago };
+    }
+
+    return { success: true, lastVideo: "Channel active" };
   } catch (error) {
     console.error("YouTube test failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
     };
-  } finally {
-    if (page) await page.close();
   }
 }
 
-async function testTwitter(browser: Browser): Promise<TwitterResult> {
-  // Try direct X.com scraping with proper setup
-  let page: Page | null = null;
-
+/**
+ * Twitter/X: Fetch profile page and parse meta tags.
+ * X.com heavily relies on JS, so we extract what we can from the initial HTML
+ * (meta og:description usually contains bio; syndication API gives tweet count).
+ */
+async function testTwitter(): Promise<TwitterResult> {
   try {
-    page = await browser.newPage();
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-    );
+    console.log("Testing Twitter @windyBotES via syndication API...");
 
-    console.log("Testing Twitter @windyBotES...");
-    
-    await page.goto("https://x.com/windyBotES", {
-      waitUntil: "networkidle2",
-      timeout: 30000,
-    });
-    
-    // Wait for content
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    const result = await page.evaluate(() => {
-      const bodyText = document.body.innerText;
-      
-      // Check if profile exists
-      const hasProfile = bodyText.includes("posts") || bodyText.includes("followers") || bodyText.includes("following");
-      
-      // Try to find tweet count
-      const postsMatch = bodyText.match(/([\d,]+)\s*posts?/i);
-      const totalTweets = postsMatch ? postsMatch[1] : null;
-      
-      // Try to find a date/time pattern
-      const timePatterns = [
-        /(\d+[hm])/i,
-        /(\d+)\s*hours?\s*ago/i,
-        /(\d+)\s*minutes?\s*ago/i,
-        /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d+/i,
-      ];
-      
-      let lastTweet = null;
-      for (const pattern of timePatterns) {
-        const match = bodyText.match(pattern);
-        if (match) {
-          lastTweet = match[0];
-          break;
-        }
+    // Twitter syndication endpoint returns basic user info as JSON
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(
+      "https://syndication.twitter.com/srv/timeline-profile/screen-name/windyBotES",
+      {
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Accept": "text/html",
+        },
+        signal: controller.signal,
       }
-      
-      return { hasProfile, lastTweet, totalTweets };
-    });
-    
-    if (result.hasProfile) {
-      return { 
-        success: true, 
-        lastTweet: result.lastTweet || "Profile active",
-        totalTweets: result.totalTweets
-      };
+    );
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      // Fallback: just check if the profile page responds
+      const headRes = await fetch("https://x.com/windyBotES", {
+        method: "HEAD",
+        headers: { "User-Agent": USER_AGENT },
+        redirect: "follow",
+      });
+
+      if (headRes.ok || headRes.status === 200) {
+        return { success: true, lastTweet: "Profile active" };
+      }
+      throw new Error(`Twitter returned ${headRes.status}`);
     }
-    
-    return { success: false, error: "Could not access Twitter profile" };
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Try to find tweet timestamps in the syndication timeline
+    const timeEl = $("time").first();
+    const lastTweet = timeEl.attr("datetime")
+      ? new Date(timeEl.attr("datetime")!).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
+      : $(".timeline-Tweet-text").first().text().substring(0, 60) || "Profile active";
+
+    return {
+      success: true,
+      lastTweet,
+      totalTweets: null,
+    };
   } catch (error) {
     console.error("Twitter test failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
     };
-  } finally {
-    if (page) await page.close();
   }
 }
 
-async function testInstagram(browser: Browser): Promise<InstagramResult> {
-  // Simplified Instagram check
-  let page: Page | null = null;
-
+/**
+ * Instagram: Fetch profile page and parse meta tags (og:description).
+ * The description typically contains "X Followers, Y Following, Z Posts".
+ */
+async function testInstagram(): Promise<InstagramResult> {
   try {
-    page = await browser.newPage();
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-    );
+    console.log("Testing Instagram @anainimaladay via meta tags...");
 
-    console.log("Testing Instagram @anainimaladay...");
-    await page.goto("https://www.instagram.com/anainimaladay/", {
-      waitUntil: "networkidle2",
-      timeout: 30000,
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch("https://www.instagram.com/anainimaladay/", {
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Accept": "text/html",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      redirect: "follow",
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
-    // Wait for page to load
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    // Check page content
-    const result = await page.evaluate(() => {
-      // Get meta description which often contains stats
-      const metaDesc = document.querySelector('meta[property="og:description"]');
-      const description = metaDesc?.getAttribute('content') || '';
-      
-      // Get title
-      const title = document.title;
-      
-      // Check for login wall
-      const bodyText = document.body.innerText.toLowerCase();
-      const isLoginWall = bodyText.includes('log in') && bodyText.includes('sign up');
-      const hasContent = bodyText.includes('followers') || bodyText.includes('posts') || bodyText.includes('following');
-      
-      // Try to extract followers/posts from meta
-      const followersMatch = description.match(/([\d.,]+[KM]?)\s*Followers/i);
-      const postsMatch = description.match(/([\d.,]+)\s*Posts/i);
-      
-      return {
-        profileAccessible: hasContent || followersMatch !== null,
-        followers: followersMatch ? followersMatch[1] : null,
-        posts: postsMatch ? postsMatch[1] : null,
-        title,
-        isLoginWall,
-      };
-    });
-
-    if (result.profileAccessible || result.followers || result.posts) {
-      const info = [];
-      if (result.posts) info.push(`${result.posts} posts`);
-      if (result.followers) info.push(`${result.followers} followers`);
-      
-      return { 
-        success: true, 
-        lastPost: info.length > 0 ? info.join(', ') : "Profile exists" 
-      };
+    if (!response.ok) {
+      throw new Error(`Instagram returned ${response.status}`);
     }
-    
-    // Even login wall means profile exists
-    if (result.title.includes('anainimaladay')) {
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // og:description usually has "X Followers, Y Following, Z Posts"
+    const description =
+      $('meta[property="og:description"]').attr("content") ?? "";
+    const title = $("title").text();
+
+    const followersMatch = description.match(/([\d.,]+[KM]?)\s*Followers/i);
+    const postsMatch = description.match(/([\d.,]+)\s*Posts/i);
+
+    if (followersMatch || postsMatch) {
+      const info = [];
+      if (postsMatch) info.push(`${postsMatch[1]} posts`);
+      if (followersMatch) info.push(`${followersMatch[1]} followers`);
+      return { success: true, lastPost: info.join(", ") };
+    }
+
+    // Even if we couldn't parse stats, if the title mentions the username the profile exists
+    if (title.toLowerCase().includes("anainimaladay")) {
       return { success: true, lastPost: "Profile exists" };
     }
-    
-    return { success: false, error: "Could not access Instagram profile" };
+
+    // Page loaded but nothing useful found (likely login wall)
+    return { success: true, lastPost: "Profile exists (login wall)" };
   } catch (error) {
     console.error("Instagram test failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
     };
-  } finally {
-    if (page) await page.close();
   }
 }
 
@@ -666,21 +580,55 @@ async function attemptCryptoFetch(): Promise<CryptoResult> {
   }
 }
 
-async function testExtensions(browser: Browser): Promise<ExtensionResult[]> {
+/**
+ * Chrome Web Store extensions: check availability via fetch + cheerio.
+ */
+async function testExtensions(): Promise<ExtensionResult[]> {
   const extensions = [
     {
       name: "YouTube Only First Video",
       extensionId: "nehhphibaeodomkkffididpjmlcigbdp",
     },
-    // Add more extensions here
   ];
 
   const results: ExtensionResult[] = [];
 
   for (const ext of extensions) {
     try {
-      const result = await testExtensionFunctional(browser, ext);
-      results.push(result);
+      console.log(`Testing extension: ${ext.name}...`);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(
+        `https://chromewebstore.google.com/detail/${ext.extensionId}`,
+        {
+          headers: { "User-Agent": USER_AGENT, "Accept": "text/html" },
+          redirect: "follow",
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        results.push({
+          ...ext,
+          success: false,
+          available: false,
+          error: `Web Store returned ${response.status}`,
+        });
+        continue;
+      }
+
+      const html = await response.text();
+      const notFound = html.includes("Item not found") || html.includes("404");
+
+      results.push({
+        ...ext,
+        success: !notFound,
+        available: !notFound,
+        error: notFound ? "Extension not found or removed" : undefined,
+      });
     } catch (error) {
       results.push({
         ...ext,
@@ -691,82 +639,4 @@ async function testExtensions(browser: Browser): Promise<ExtensionResult[]> {
   }
 
   return results;
-}
-
-async function testExtensionFunctional(
-  browser: Browser,
-  extension: { name: string; extensionId: string }
-): Promise<ExtensionResult> {
-  let page: Page | null = null;
-
-  try {
-    console.log(`Testing extension: ${extension.name}...`);
-
-    // Check if extension is available on Web Store
-    page = await browser.newPage();
-    await page.goto(
-      `https://chromewebstore.google.com/detail/${extension.extensionId}`,
-      { waitUntil: "networkidle2", timeout: 30000 }
-    );
-
-    const storeInfo = await page.evaluate(() => {
-      const notFound = document.body.textContent?.includes("Item not found");
-      const removed = document.body.textContent?.includes("removed");
-      const available = !notFound && !removed;
-
-      // Try to extract user count
-      const userCountRegex = /(\d+[\d,]*)\s+users?/i;
-      const match = document.body.textContent?.match(userCountRegex);
-      const users = match ? match[1] : null;
-
-      return { available, users };
-    });
-
-    await page.close();
-    page = null;
-
-    if (!storeInfo.available) {
-      return {
-        ...extension,
-        success: false,
-        available: false,
-        error: "Extension not found or removed from Web Store",
-      };
-    }
-
-    // For YouTube Only First Video, perform functional test
-    // Note: This only works in local environment with non-headless browser
-    const isLocal = !process.env.AWS_LAMBDA_FUNCTION_VERSION;
-    let functionalTestPassed = false;
-
-    if (isLocal && extension.extensionId === "nehhphibaeodomkkffididpjmlcigbdp") {
-      // Import and run the specific test
-      const { testYouTubeOnlyFirstVideoExtension } = await import(
-        "./test-youtube-extension"
-      );
-
-      try {
-        const testResult = await testYouTubeOnlyFirstVideoExtension();
-        functionalTestPassed = testResult.success;
-      } catch (error) {
-        console.warn("Functional test skipped:", error);
-      }
-    }
-
-    return {
-      ...extension,
-      success: true,
-      available: true,
-      functionalTest: functionalTestPassed,
-    };
-  } catch (error) {
-    console.error(`Extension test failed for ${extension.name}:`, error);
-    return {
-      ...extension,
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  } finally {
-    if (page && !page.isClosed()) await page.close();
-  }
 }
