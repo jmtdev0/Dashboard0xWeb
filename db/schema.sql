@@ -39,6 +39,18 @@ CREATE TRIGGER trigger_keep_latest_dashboard
   FOR EACH ROW
   EXECUTE FUNCTION keep_latest_dashboard();
 
+-- Tabla para Tours
+CREATE TABLE IF NOT EXISTS tours (
+  id VARCHAR(50) PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Índice para tours
+CREATE INDEX IF NOT EXISTS idx_tours_created ON tours(created_at DESC);
+
 -- Trigger para actualizar updated_at en todos
 CREATE OR REPLACE FUNCTION update_todos_timestamp()
 RETURNS TRIGGER AS $$
