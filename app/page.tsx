@@ -1,422 +1,387 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { TestResult } from "@/lib/scraper";
+import { useEffect, useMemo, useState } from "react";
+import { MusicController } from "@/app/components/music-controller";
+import { ProjectMap3D } from "@/app/components/project-map-3d";
+import { ProjectMapPlayroom } from "@/app/components/project-map-playroom";
+import {
+  CATEGORY_STYLES,
+  STATUS_STYLES,
+  buildProjectNodes,
+  metricToneClass,
+  toPublicDashboardData,
+  type CategoryId,
+  type DashboardResponse,
+  type DataState,
+  type ProjectNode,
+  type PublicDashboardData,
+} from "@/lib/public-project-map";
+import { MUSIC_TRACKS } from "@/lib/music-tracks";
+
+const DASHBOARD_VISUALIZATIONS = ["crystarium", "playroom"] as const;
+
+type DashboardVisualization = (typeof DASHBOARD_VISUALIZATIONS)[number];
 
 export default function Dashboard() {
-  const [data, setData] = useState<TestResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<PublicDashboardData | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [visualization, setVisualization] =
+    useState<DashboardVisualization | null>(null);
 
-  // Load initial data
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    const selected = selectInitialVisualization();
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const timer = window.setTimeout(
+      () => setVisualization(selected),
+      reducedMotion ? 250 : 950
+    );
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const dataState: DataState = data ? "ready" : error ? "error" : "loading";
+  const nodes = useMemo(
+    () => buildProjectNodes(data?.results ?? null, dataState),
+    [data?.results, dataState]
+  );
+  const selectedNode =
+    nodes.find((node) => node.id === selectedNodeId) ?? null;
+
+  const handleToggleCategory = (category: CategoryId) => {
+    setActiveCategory((current) => (current === category ? null : category));
+    setSelectedNodeId(null);
+  };
+
   const loadData = async () => {
-    console.log("📊 [PUBLIC DASHBOARD] Loading data...");
+    setInitialLoading(true);
+
     try {
       const response = await fetch("/api/results");
-      console.log("📡 [PUBLIC DASHBOARD] Response status:", response.status);
+      const payload = (await response.json()) as DashboardResponse;
 
-      const result = await response.json();
-      console.log("📦 [PUBLIC DASHBOARD] Full response:", JSON.stringify(result, null, 2));
-      console.log("📦 [PUBLIC DASHBOARD] Data received:", {
-        hasResults: !!result.results,
-        timestamp: result.timestamp,
-        message: result.message,
-      });
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to load data");
+      }
 
-      if (result.results) {
-        // Log each service indicator
-        console.log("🎥 [YOUTUBE]", {
-          success: result.results.youtube?.success,
-          lastVideo: result.results.youtube?.lastVideo,
-          error: result.results.youtube?.error,
-        });
-        console.log("🐦 [TWITTER]", {
-          success: result.results.twitter?.success,
-          lastTweet: result.results.twitter?.lastTweet,
-          totalTweets: result.results.twitter?.totalTweets,
-          error: result.results.twitter?.error,
-        });
-        console.log("📷 [INSTAGRAM]", {
-          success: result.results.instagram?.success,
-          lastPost: result.results.instagram?.lastPost,
-          error: result.results.instagram?.error,
-        });
-        console.log("🎮 [GITHUB]", {
-          success: result.results.github?.success,
-          version: result.results.github?.version,
-          downloads: result.results.github?.downloads,
-          error: result.results.github?.error,
-        });
-        console.log("🧩 [EXTENSIONS]", {
-          count: result.results.extensions?.length || 0,
-          extensions: result.results.extensions?.map((ext: any) => ({
-            name: ext.name,
-            available: ext.available,
-            error: ext.error,
-          })),
-        });
+      const publicData = toPublicDashboardData(payload);
 
-        setData(result);
-        setLastUpdate(result.timestamp);
+      if (publicData) {
+        setData(publicData);
         setError(null);
-        console.log("✅ [PUBLIC DASHBOARD] Data loaded successfully");
       } else {
-        console.log("⚠️ [PUBLIC DASHBOARD] No results in response");
-        setError(result.message || "No data available yet");
+        setData(null);
+        setError(payload.message || "No data available yet");
       }
     } catch (err) {
-      console.error("❌ [PUBLIC DASHBOARD] Failed to load data:", err);
-      setError("Failed to load data");
+      console.error("Failed to load public dashboard data:", err);
+      setData(null);
+      setError(err instanceof Error ? err.message : "Failed to load data");
+    } finally {
+      setInitialLoading(false);
     }
   };
 
   const handleRefresh = async () => {
-    console.log("🔄 [PUBLIC DASHBOARD] Manual refresh triggered");
-    setLoading(true);
+    setRefreshing(true);
     setError(null);
 
     try {
-      console.log("🚀 [PUBLIC DASHBOARD] Calling scrape API...");
       const response = await fetch("/api/scrape", {
         method: "POST",
       });
+      const payload = (await response.json()) as DashboardResponse;
 
-      console.log("📡 [PUBLIC DASHBOARD] Scrape response:", {
-        ok: response.ok,
-        status: response.status,
-      });
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to refresh data");
+      }
 
-      const result = await response.json();
-      console.log("📦 [PUBLIC DASHBOARD] Scrape result:", {
-        success: result.success,
-        timestamp: result.timestamp,
-        hasResults: !!result.results,
-      });
+      const publicData = toPublicDashboardData(payload);
 
-      if (response.ok) {
-        setData(result);
-        setLastUpdate(result.timestamp);
-        console.log("✅ [PUBLIC DASHBOARD] Refresh successful");
+      if (publicData) {
+        setData(publicData);
       } else {
-        console.log("❌ [PUBLIC DASHBOARD] Scrape failed:", result.error);
-        setError(result.error || "Failed to refresh data");
+        setError(payload.message || "Refresh completed without public data");
       }
     } catch (err) {
-      console.error("❌ [PUBLIC DASHBOARD] Refresh error:", err);
-      setError("Failed to refresh data");
+      console.error("Failed to refresh public dashboard data:", err);
+      setError(err instanceof Error ? err.message : "Failed to refresh data");
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-300 via-sky-200 to-blue-100 dark:from-sky-900 dark:to-blue-800">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <header className="mb-8">
-          <div className="flex items-center justify-end">
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg shadow-lg transition-all disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  Running Tests...
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  Refresh Now
-                </>
-              )}
-            </button>
-          </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#020617] text-slate-100">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(168,85,247,0.24),transparent_34%),radial-gradient(circle_at_17%_24%,rgba(236,72,153,0.16),transparent_28%),radial-gradient(circle_at_82%_24%,rgba(59,130,246,0.18),transparent_30%)]" />
 
-          {lastUpdate && (
-            <p className="text-sm text-slate-700 dark:text-sky-100 mt-4">
-              Last updated: {new Date(lastUpdate).toLocaleString()}
-            </p>
-          )}
+      {!visualization && <VisualizationLoadingScreen />}
 
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-red-800 dark:text-red-200">{error}</p>
-            </div>
-          )}
-        </header>
+      {error && (
+        <div
+          role="alert"
+          className="pointer-events-auto fixed left-4 right-20 top-5 z-30 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-100 backdrop-blur-md sm:left-6 sm:max-w-xl lg:left-8"
+        >
+          {error}
+        </div>
+      )}
 
-        {/* Dashboard Grid */}
-        {data && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* YouTube Card */}
-            <ServiceCard
-              title="YouTube (@jmtdev)"
-              icon="🎥"
-              status={data.results.youtube.success}
-              data={[
-                {
-                  label: "Last Video",
-                  value: data.results.youtube.lastVideo || "N/A",
-                },
-              ]}
-              error={data.results.youtube.error}
-              link="https://www.youtube.com/@jmtdev"
-            />
+      {visualization && (
+        <>
+          <button
+            onClick={handleRefresh}
+            disabled={initialLoading || refreshing}
+            aria-label={
+              initialLoading
+                ? "Loading dashboard data"
+                : refreshing
+                  ? "Refreshing dashboard data"
+                  : "Refresh dashboard data"
+            }
+            title={
+              initialLoading
+                ? "Loading"
+                : refreshing
+                  ? "Refreshing"
+                  : "Refresh Now"
+            }
+            className="fixed right-4 top-5 z-40 grid h-12 w-12 place-items-center rounded-lg border border-blue-300/30 bg-blue-500/15 text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.18)] transition hover:border-blue-300/60 hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:right-6 lg:right-8"
+          >
+            <RefreshIcon spinning={refreshing || initialLoading} />
+          </button>
 
-            {/* Twitter Card */}
-            <ServiceCard
-              title="Twitter (@windyBotES)"
-              icon="🐦"
-              status={data.results.twitter.success}
-              data={[
-                {
-                  label: "Last Tweet",
-                  value: data.results.twitter.lastTweet || "N/A",
-                },
-                {
-                  label: "Total Tweets",
-                  value: data.results.twitter.totalTweets || "N/A",
-                },
-              ]}
-              error={data.results.twitter.error}
-              link="https://x.com/windyBotES"
-            />
-
-            {/* Instagram Card */}
-            <ServiceCard
-              title="Instagram (@anainimaladay)"
-              icon="📷"
-              status={data.results.instagram.success}
-              data={[
-                {
-                  label: "Last Post",
-                  value: data.results.instagram.lastPost || "N/A",
-                },
-              ]}
-              error={data.results.instagram.error}
-              link="https://www.instagram.com/anainimaladay/"
-            />
-
-            {/* GitHub Card */}
-            <ServiceCard
-              title="Kingdom Hearts Custom Music"
-              icon="🎮"
-              status={data.results.github.success}
-              data={[
-                {
-                  label: "Latest Version",
-                  value: data.results.github.version || "N/A",
-                },
-                {
-                  label: "Release Date",
-                  value: data.results.github.releaseDate
-                    ? new Date(
-                        data.results.github.releaseDate
-                      ).toLocaleDateString()
-                    : "N/A",
-                },
-                {
-                  label: "Downloads",
-                  value: data.results.github.downloads?.toString() || "N/A",
-                },
-              ]}
-              error={data.results.github.error}
-              link="https://github.com/jmtdev0/KingdomHeartsCustomMusic"
-            />
-
-            {/* Extension Cards */}
-            {data.results.extensions.map((ext) => (
-              <ServiceCard
-                key={ext.extensionId}
-                title={ext.name}
-                icon="🧩"
-                status={ext.success}
-                data={[
-                  {
-                    label: "Available",
-                    value: ext.available ? "✓ Yes" : "✗ No",
-                    color: ext.available ? "text-green-600" : "text-red-600",
-                  },
-                  {
-                    label: "Functional Test",
-                    value: ext.functionalTest ? "✓ Passed" : "○ Skipped",
-                    color: ext.functionalTest
-                      ? "text-green-600"
-                      : "text-slate-400",
-                  },
-                ]}
-                error={ext.error}
-                link={`https://chromewebstore.google.com/detail/${ext.extensionId}`}
+          <main className="fixed inset-0 z-10">
+            {visualization === "crystarium" ? (
+              <ProjectMap3D
+                nodes={nodes}
+                activeCategory={activeCategory}
+                selectedNodeId={selectedNodeId}
+                onToggleCategory={handleToggleCategory}
+                onSelectNode={setSelectedNodeId}
               />
-            ))}
+            ) : (
+              <ProjectMapPlayroom
+                nodes={nodes}
+                activeCategory={activeCategory}
+                selectedNodeId={selectedNodeId}
+                onToggleCategory={handleToggleCategory}
+                onSelectNode={setSelectedNodeId}
+              />
+            )}
+          </main>
 
-            {/* BeTheCandle Card */}
-            <ServiceCard
-              title="Be The Candle"
-              icon="🕯️"
-              status={data.results.bethecandle?.success ?? false}
-              data={[
-                {
-                  label: "Total Distributed",
-                  value: data.results.bethecandle?.totalDistributed != null
-                    ? `$${data.results.bethecandle.totalDistributed.toFixed(2)} USDC`
-                    : "N/A",
-                },
-              ]}
-              error={data.results.bethecandle?.error}
-              link="https://bethecandle.live/history"
+          <MusicController tracks={MUSIC_TRACKS} />
+
+          {selectedNode && (
+            <DetailPanel
+              node={selectedNode}
+              onClose={() => setSelectedNodeId(null)}
             />
-          </div>
-        )}
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
-        {!data && !error && (
-          <div className="text-center py-12">
-            <p className="text-slate-800 dark:text-sky-50 text-lg">
-              Loading dashboard data...
-            </p>
-          </div>
-        )}
+function selectInitialVisualization(): DashboardVisualization {
+  const requested = new URLSearchParams(window.location.search).get("view");
+
+  if (
+    requested &&
+    DASHBOARD_VISUALIZATIONS.includes(requested as DashboardVisualization)
+  ) {
+    return requested as DashboardVisualization;
+  }
+
+  return DASHBOARD_VISUALIZATIONS[
+    Math.floor(Math.random() * DASHBOARD_VISUALIZATIONS.length)
+  ];
+}
+
+function VisualizationLoadingScreen() {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#07111f] text-white"
+      aria-busy="true"
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(96,165,250,0.22),transparent_32%),radial-gradient(circle_at_34%_70%,rgba(236,72,153,0.16),transparent_28%)]" />
+      <div className="relative flex flex-col items-center gap-5 text-center">
+        <div className="relative h-28 w-28">
+          <span className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white/70 bg-[radial-gradient(circle_at_32%_26%,#fff_0_10%,#60a5fa_11%_42%,#a855f7_72%)] shadow-[0_18px_34px_rgba(37,99,235,0.32)]" />
+          <span className="absolute left-1 top-4 h-9 w-9 rounded-full border-2 border-white/70 bg-[radial-gradient(circle_at_32%_26%,#fff_0_12%,#ec4899_13%_100%)] animate-bounce" />
+          <span className="absolute bottom-2 right-0 h-10 w-10 rounded-full border-2 border-white/70 bg-[radial-gradient(circle_at_32%_26%,#fff_0_12%,#f59e0b_13%_100%)] animate-pulse" />
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-normal text-blue-200">
+            Choosing a view
+          </p>
+          <p className="mt-2 text-lg font-bold text-white">
+            Rolling the dashboard into place
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-function ServiceCard({
-  title,
-  icon,
-  status,
-  data,
-  error,
-  link,
+function DetailPanel({
+  node,
+  onClose,
 }: {
-  title: string;
-  icon: string;
-  status: boolean;
-  data: Array<{ label: string; value: string; color?: string }>;
-  error?: string;
-  link?: string;
+  node: ProjectNode;
+  onClose: () => void;
 }) {
+  const categoryStyle = CATEGORY_STYLES[node.category];
+  const status = STATUS_STYLES[node.status];
+
   return (
-    <div
-      className={`bg-sky-50 dark:bg-sky-900/40 rounded-xl shadow-lg p-6 border-2 transition-all hover:shadow-xl ${
-        status
-          ? "border-blue-600 dark:border-blue-500"
-          : "border-red-600 dark:border-red-500"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">{icon}</span>
+    <aside className="fixed inset-x-4 bottom-4 z-40 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-white/15 bg-slate-950/95 p-5 shadow-2xl shadow-black/40 backdrop-blur-xl sm:left-auto sm:right-6 sm:top-20 sm:w-[390px]">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:bg-white/10 hover:text-white"
+        aria-label="Close detail panel"
+      >
+        <CloseIcon />
+      </button>
+
+      <div className="pr-10">
+        <div className="flex items-center gap-4">
+          <NodeIcon node={node} />
           <div>
-            <h3 className="font-semibold text-slate-900 dark:text-sky-50">
-              {title}
-            </h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  status ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              <span
-                className={`text-xs font-medium ${
-                  status
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
-                }`}
-              >
-                {status ? "Operational" : "Error"}
-              </span>
-            </div>
+            <p
+              className={`text-xs font-bold uppercase tracking-[0.18em] ${categoryStyle.accentClass}`}
+            >
+              {categoryStyle.title}
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-white">{node.title}</h2>
           </div>
         </div>
-        {link && (
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-700 hover:text-blue-800 dark:text-sky-200 dark:hover:text-sky-100"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
-            </svg>
-          </a>
-        )}
+
+        <p className="mt-5 text-sm leading-6 text-slate-300">
+          {node.description}
+        </p>
       </div>
 
-      {/* Data */}
-      {data.length > 0 && (
-        <div className="space-y-2">
-          {data.map((item, index) => (
-            <div key={index} className="flex justify-between items-center">
-              <span className="text-sm text-slate-700 dark:text-sky-200">
-                {item.label}:
-              </span>
-              <span
-                className={`text-sm font-medium ${
-                  item.color || "text-slate-900 dark:text-sky-50"
-                }`}
-              >
-                {item.value}
-              </span>
-            </div>
-          ))}
+      <div className="mt-5 flex items-center gap-2 border-y border-white/10 py-4 text-sm">
+        <span className={`h-2.5 w-2.5 rounded-full ${status.dotClass}`} />
+        <span className={status.textClass}>{status.label}</span>
+      </div>
+
+      <dl className="mt-4 space-y-3">
+        {node.metrics.map((metric) => (
+          <div key={metric.label} className="flex items-start justify-between gap-4">
+            <dt className="text-sm text-slate-400">{metric.label}</dt>
+            <dd
+              className={`max-w-[58%] text-right text-sm font-medium ${metricToneClass(
+                metric.tone
+              )}`}
+            >
+              {metric.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {node.error && (
+        <div className="mt-5 rounded-lg border border-red-400/30 bg-red-500/10 p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-red-200">
+            Current error
+          </p>
+          <p className="mt-2 text-sm leading-6 text-red-100">{node.error}</p>
         </div>
       )}
 
-      {/* Error */}
-      {error && (
-        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-        </div>
-      )}
-    </div>
+      <a
+        href={node.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => event.stopPropagation()}
+        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-blue-100"
+      >
+        Open link
+        <ExternalIcon />
+      </a>
+    </aside>
+  );
+}
+
+function NodeIcon({ node }: { node: ProjectNode }) {
+  const categoryStyle = CATEGORY_STYLES[node.category];
+
+  return (
+    <span
+      className={`grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 text-base font-black ${categoryStyle.borderClass} ${categoryStyle.surfaceClass} ${categoryStyle.accentClass} ${categoryStyle.glowClass}`}
+      aria-hidden="true"
+    >
+      {node.icon}
+    </span>
+  );
+}
+
+function RefreshIcon({ spinning }: { spinning: boolean }) {
+  return (
+    <svg
+      className={`h-4 w-4 ${spinning ? "animate-spin" : ""}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M4 4v6h6M20 20v-6h-6M5.3 15A7 7 0 0 0 17.7 18M18.7 9A7 7 0 0 0 6.3 6"
+      />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M6 6l12 12M18 6L6 18"
+      />
+    </svg>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M14 4h6v6M20 4l-9 9M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"
+      />
+    </svg>
   );
 }

@@ -33,6 +33,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [categoryFilterIds, setCategoryFilterIds] = useState<string[]>([]);
+  const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -224,6 +225,11 @@ export default function TodoManager({ token }: TodoManagerProps) {
     setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
   };
 
+  const handleViewDetails = (todo: Todo) => {
+    setDetailTodo(todo);
+    setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+  };
+
   const handleSaveEdit = async (todo: Todo) => {
     if (!editText.trim()) {
       setEditingId(null);
@@ -410,8 +416,9 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const handleExportCSV = () => {
-    const headers = ["ID", "Text", "Completed", "Pinned", "Category ID", "Created At", "Completed At"];
+    const headers = ["Number", "ID", "Text", "Completed", "Pinned", "Category ID", "Created At", "Completed At"];
     const rows = sortedTodos.map((todo) => [
+      todo.todoNumber,
       todo.id,
       `"${todo.text.replace(/"/g, '""')}"`,
       todo.completed ? "Yes" : "No",
@@ -437,7 +444,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
 
   const handleCopyToClipboard = () => {
     const text = sortedTodos
-      .map((todo) => `${todo.pinned ? "📌 " : ""}${todo.completed ? "✓" : "○"} ${todo.text}`)
+      .map((todo) => `#${todo.todoNumber} ${todo.pinned ? "📌 " : ""}${todo.completed ? "✓" : "○"} ${todo.text}`)
       .join("\n");
 
     navigator.clipboard.writeText(text).then(
@@ -447,12 +454,18 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const selectedTodo = todos.find((t) => t.id === contextMenu.todoId);
+  const visibleDetailTodo = detailTodo
+    ? todos.find((todo) => todo.id === detailTodo.id) ?? detailTodo
+    : null;
+  const detailCategory = visibleDetailTodo
+    ? getCategoryBreadcrumb(visibleDetailTodo.categoryId) ?? "Uncategorized"
+    : null;
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
+    <div className="mx-auto w-full max-w-6xl">
       {/* Header Section */}
-      <div className="bg-white dark:bg-sky-900/60 backdrop-blur-sm rounded-xl shadow-lg border-2 border-sky-200 dark:border-sky-700 p-6 mb-6">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-sky-50 mb-6">
+      <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 p-4 sm:p-6">
+        <h2 className="mb-6 text-2xl font-black text-neutral-950">
           TODO List
         </h2>
 
@@ -465,7 +478,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
             placeholder="Add new todo..."
             maxLength={500}
             autoFocus
-            className="w-full px-4 py-3 border-2 border-sky-300 dark:border-sky-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-sky-800/50 dark:text-sky-50"
+            className="w-full rounded-md border border-neutral-300 bg-white px-4 py-3 text-neutral-950 outline-none transition-colors placeholder:text-neutral-500 focus:border-neutral-950"
           />
           <CategorySelector
             token={token}
@@ -475,7 +488,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
           <button
             type="submit"
             disabled={!newTodoText.trim() || activeTodosCount >= 200 || isAddingTodo}
-            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-950 bg-neutral-950 px-6 py-3 font-bold text-white transition-colors hover:bg-white hover:text-neutral-950 disabled:cursor-not-allowed disabled:border-neutral-300 disabled:bg-neutral-200 disabled:text-neutral-500"
           >
             {isAddingTodo ? (
               <>
@@ -519,33 +532,33 @@ export default function TodoManager({ token }: TodoManagerProps) {
         </div>
 
         {/* Status Tabs */}
-        <div className="flex border-b-2 border-sky-200 dark:border-sky-700 mb-4">
+        <div className="mb-4 flex gap-2 border-b border-neutral-200 pb-3">
           <button
             onClick={() => setFilter("active")}
-            className={`flex-1 py-3 font-semibold transition-colors text-sm sm:text-base ${
+            className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold transition-colors sm:text-base ${
               filter === "active"
-                ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                ? "border-neutral-950 bg-neutral-950 text-white"
+                : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-950 hover:text-neutral-950"
             }`}
           >
             Active ({activeTodosCount})
           </button>
           <button
             onClick={() => setFilter("completed")}
-            className={`flex-1 py-3 font-semibold transition-colors text-sm sm:text-base ${
+            className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold transition-colors sm:text-base ${
               filter === "completed"
-                ? "border-b-2 border-green-500 text-green-600 dark:text-green-400"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                ? "border-neutral-950 bg-neutral-950 text-white"
+                : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-950 hover:text-neutral-950"
             }`}
           >
             Completed ({completedTodosCount})
           </button>
           <button
             onClick={() => setFilter("all")}
-            className={`flex-1 py-3 font-semibold transition-colors text-sm sm:text-base ${
+            className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold transition-colors sm:text-base ${
               filter === "all"
-                ? "border-b-2 border-purple-500 text-purple-600 dark:text-purple-400"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                ? "border-neutral-950 bg-neutral-950 text-white"
+                : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-950 hover:text-neutral-950"
             }`}
           >
             All ({todos.length})
@@ -558,14 +571,14 @@ export default function TodoManager({ token }: TodoManagerProps) {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="flex-1 px-4 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
+              className="flex-1 rounded-md border border-neutral-300 bg-white px-4 py-2 text-neutral-950 outline-none focus:border-neutral-950"
             >
               <option value="createdAt">Sort by Created Date</option>
               <option value="completedAt">Sort by Completed Date</option>
             </select>
             <button
               onClick={() => setShowCategoryManager(true)}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
+              className="flex items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-6 py-2 font-bold text-neutral-950 transition-colors hover:border-neutral-950"
               title="Manage categories"
             >
               <svg
@@ -586,7 +599,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
             <button
               onClick={loadTodos}
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-6 py-2 font-bold text-neutral-950 transition-colors hover:border-neutral-950 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
               title="Refresh todo list"
             >
               <svg
@@ -611,7 +624,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
             <button
               onClick={handleExportJSON}
               disabled={sortedTodos.length === 0}
-              className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 font-bold text-neutral-950 transition-colors hover:border-neutral-950 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
               title="Export filtered todos as JSON"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -622,7 +635,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
             <button
               onClick={handleExportCSV}
               disabled={sortedTodos.length === 0}
-              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 font-bold text-neutral-950 transition-colors hover:border-neutral-950 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
               title="Export filtered todos as CSV"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -633,7 +646,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
             <button
               onClick={handleCopyToClipboard}
               disabled={sortedTodos.length === 0}
-              className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 font-bold text-neutral-950 transition-colors hover:border-neutral-950 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
               title="Copy filtered todos to clipboard"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -651,7 +664,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
           <button
             onClick={handleFixEncoding}
             disabled={isFixingEncoding}
-            className="w-full px-4 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-400 text-white rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-neutral-950 bg-white px-4 py-3 font-bold text-neutral-950 transition-colors hover:bg-neutral-950 hover:text-white disabled:cursor-not-allowed disabled:border-neutral-300 disabled:bg-neutral-100 disabled:text-neutral-400"
           >
             {isFixingEncoding ? (
               <>
@@ -698,8 +711,8 @@ export default function TodoManager({ token }: TodoManagerProps) {
         )}
 
         {error && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+          <div className="mt-4 rounded-md border border-neutral-950 bg-white p-3">
+            <p className="text-sm font-semibold text-neutral-950">{error}</p>
           </div>
         )}
       </div>
@@ -708,19 +721,28 @@ export default function TodoManager({ token }: TodoManagerProps) {
       {contextMenu.visible && selectedTodo && (
         <div
           ref={contextMenuRef}
-          className="fixed bg-white dark:bg-sky-800 border-2 border-sky-300 dark:border-sky-600 rounded-lg shadow-xl z-50 py-1 min-w-[200px]"
+          className="fixed z-50 min-w-[200px] rounded-md border border-neutral-950 bg-white py-1 shadow-lg"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
+            onClick={() => handleViewDetails(selectedTodo)}
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-neutral-950 hover:bg-neutral-100"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0A9 9 0 113 12a9 9 0 0118 0z" />
+            </svg>
+            View details
+          </button>
+          <button
             onClick={() => handleTogglePin(selectedTodo)}
-            className="w-full px-4 py-2 text-left hover:bg-sky-100 dark:hover:bg-sky-700 text-slate-900 dark:text-sky-50 flex items-center gap-2"
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-neutral-950 hover:bg-neutral-100"
           >
             <span className="text-lg">📌</span>
             {selectedTodo.pinned ? "Unpin" : "Pin"}
           </button>
           <button
             onClick={() => handleStartEdit(selectedTodo)}
-            className="w-full px-4 py-2 text-left hover:bg-sky-100 dark:hover:bg-sky-700 text-slate-900 dark:text-sky-50 flex items-center gap-2"
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-neutral-950 hover:bg-neutral-100"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -729,7 +751,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
           </button>
           <button
             onClick={() => handleDelete(selectedTodo)}
-            className="w-full px-4 py-2 text-left hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 flex items-center gap-2"
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-neutral-950 hover:bg-neutral-100"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -744,7 +766,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
         {loading && (
           <div className="text-center py-12">
             <div className="animate-pulse">
-              <p className="text-slate-800 dark:text-sky-50 text-lg">
+              <p className="text-lg font-bold text-neutral-950">
                 Loading todos...
               </p>
             </div>
@@ -752,8 +774,8 @@ export default function TodoManager({ token }: TodoManagerProps) {
         )}
 
         {!loading && sortedTodos.length === 0 && (
-          <div className="text-center py-12 bg-white dark:bg-sky-900/60 backdrop-blur-sm rounded-xl shadow-lg border-2 border-sky-200 dark:border-sky-700">
-            <p className="text-slate-600 dark:text-sky-200 text-lg">
+          <div className="rounded-md border border-neutral-200 bg-neutral-50 py-12 text-center">
+            <p className="text-lg font-bold text-neutral-600">
               No todos yet. Add one above!
             </p>
           </div>
@@ -762,12 +784,13 @@ export default function TodoManager({ token }: TodoManagerProps) {
         {sortedTodos.map((todo) => (
           <div
             key={todo.id}
-            className={`p-4 md:p-6 rounded-xl border-2 transition-all shadow-md hover:shadow-lg ${
+            className={`rounded-md border p-4 transition-colors md:p-5 ${
               todo.completed
-                ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                : "bg-sky-50 dark:bg-sky-800/40 border-sky-200 dark:border-sky-700"
+                ? "border-neutral-200 bg-neutral-50"
+                : "border-neutral-300 bg-white hover:border-neutral-950"
             }`}
             onContextMenu={(e) => handleContextMenu(e, todo.id)}
+            onDoubleClick={() => editingId !== todo.id && handleViewDetails(todo)}
             onTouchStart={(e) => handleTouchStart(e, todo.id)}
             onTouchEnd={handleTouchEnd}
             onTouchMove={handleTouchEnd}
@@ -778,7 +801,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
                 type="checkbox"
                 checked={todo.completed}
                 onChange={() => handleToggleComplete(todo)}
-                className="mt-1.5 w-5 h-5 cursor-pointer"
+                className="mt-1.5 h-5 w-5 cursor-pointer accent-neutral-950"
               />
 
               {/* Content */}
@@ -789,7 +812,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
                       type="text"
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
-                      className="w-full px-3 py-2 border-2 border-sky-300 dark:border-sky-700 rounded-lg dark:bg-sky-800/50 dark:text-sky-50"
+                      className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-950 outline-none focus:border-neutral-950"
                       autoFocus
                     />
                     <CategorySelector
@@ -800,13 +823,13 @@ export default function TodoManager({ token }: TodoManagerProps) {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleSaveEdit(todo)}
-                        className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
+                        className="flex-1 rounded-md border border-neutral-950 bg-neutral-950 px-4 py-2 font-bold text-white transition-colors hover:bg-white hover:text-neutral-950"
                       >
                         Save
                       </button>
                       <button
                         onClick={handleCancelEdit}
-                        className="flex-1 px-4 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg font-semibold"
+                        className="flex-1 rounded-md border border-neutral-300 bg-white px-4 py-2 font-bold text-neutral-950 transition-colors hover:border-neutral-950"
                       >
                         Cancel
                       </button>
@@ -814,17 +837,22 @@ export default function TodoManager({ token }: TodoManagerProps) {
                   </div>
                 ) : (
                   <>
-                    <p
-                      className={`text-base md:text-lg break-words ${
-                        todo.completed
-                          ? "line-through text-slate-600 dark:text-sky-300"
-                          : "text-slate-900 dark:text-sky-50"
-                      }`}
-                    >
+                    <p className="break-words text-base md:text-lg">
+                      <span className="mr-2 inline-flex rounded border border-neutral-300 bg-white px-2 py-0.5 text-sm font-black text-neutral-700 no-underline">
+                        #{todo.todoNumber}
+                      </span>
                       {todo.pinned && <span className="mr-2">📌</span>}
-                      {todo.text}
+                      <span
+                        className={
+                          todo.completed
+                            ? "text-neutral-500 line-through"
+                            : "text-neutral-950"
+                        }
+                      >
+                        {todo.text}
+                      </span>
                     </p>
-                    <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-slate-600 dark:text-sky-300">
+                    <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-neutral-500">
                       <span>
                         Created: {new Date(todo.createdAt).toLocaleString()}
                       </span>
@@ -834,7 +862,7 @@ export default function TodoManager({ token }: TodoManagerProps) {
                         </span>
                       )}
                       {todo.categoryId && getCategoryBreadcrumb(todo.categoryId) && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                        <span className="inline-flex items-center gap-1 rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs font-bold text-neutral-700">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                           </svg>
@@ -863,6 +891,108 @@ export default function TodoManager({ token }: TodoManagerProps) {
           token={token}
           onClose={() => setShowCategoryManager(false)}
         />
+      )}
+
+      {visibleDetailTodo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setDetailTodo(null)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-md border border-neutral-950 bg-white p-6 text-neutral-950"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="todo-detail-title"
+          >
+            <div className="mb-6 flex items-start justify-between gap-4 border-b border-neutral-200 pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  TODO #{visibleDetailTodo.todoNumber}
+                </p>
+                <h2 id="todo-detail-title" className="mt-2 text-2xl font-black">
+                  Detail
+                </h2>
+              </div>
+              <button
+                onClick={() => setDetailTodo(null)}
+                className="rounded-md border border-neutral-300 px-3 py-1 font-bold transition-colors hover:border-neutral-950"
+                aria-label="Close detail"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <p className="mb-2 text-sm font-bold uppercase text-neutral-500">
+                  Title
+                </p>
+                <p className="whitespace-pre-wrap break-words text-xl font-bold leading-relaxed">
+                  {visibleDetailTodo.text}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase text-neutral-500">Status</p>
+                  <p className="mt-1 font-bold">
+                    {visibleDetailTodo.completed ? "Completed" : "Active"}
+                  </p>
+                </div>
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase text-neutral-500">Pinned</p>
+                  <p className="mt-1 font-bold">
+                    {visibleDetailTodo.pinned ? "Yes" : "No"}
+                  </p>
+                </div>
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase text-neutral-500">Category</p>
+                  <p className="mt-1 font-bold">{detailCategory}</p>
+                </div>
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase text-neutral-500">Internal ID</p>
+                  <p className="mt-1 break-all font-mono text-sm">{visibleDetailTodo.id}</p>
+                </div>
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase text-neutral-500">Created</p>
+                  <p className="mt-1 font-bold">
+                    {new Date(visibleDetailTodo.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase text-neutral-500">Completed</p>
+                  <p className="mt-1 font-bold">
+                    {visibleDetailTodo.completedAt
+                      ? new Date(visibleDetailTodo.completedAt).toLocaleString()
+                      : "Not completed"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 border-t border-neutral-200 pt-4 sm:flex-row">
+                <button
+                  onClick={() => {
+                    setDetailTodo(null);
+                    handleStartEdit(visibleDetailTodo);
+                  }}
+                  className="flex-1 rounded-md border border-neutral-950 bg-neutral-950 px-4 py-2 font-bold text-white transition-colors hover:bg-white hover:text-neutral-950"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setDetailTodo(null);
+                    handleTogglePin(visibleDetailTodo);
+                  }}
+                  className="flex-1 rounded-md border border-neutral-300 bg-white px-4 py-2 font-bold transition-colors hover:border-neutral-950"
+                >
+                  {visibleDetailTodo.pinned ? "Unpin" : "Pin"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

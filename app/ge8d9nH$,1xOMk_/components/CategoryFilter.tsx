@@ -95,10 +95,10 @@ export default function CategoryFilter({
   if (loading) {
     return (
       <div className="mb-4">
-        <label className="block text-sm font-medium mb-2 dark:text-slate-100">
+        <label className="mb-2 block text-sm font-bold text-neutral-950">
           Filter by Category
         </label>
-        <select disabled className="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600">
+        <select disabled className="w-full rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-neutral-500">
           <option>Loading...</option>
         </select>
       </div>
@@ -107,7 +107,7 @@ export default function CategoryFilter({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium mb-2 dark:text-slate-100">
+      <label className="mb-2 block text-sm font-bold text-neutral-950">
         Filter by Category
       </label>
       <select
@@ -122,7 +122,7 @@ export default function CategoryFilter({
             onFilterChange(val, getAllDescendantIds(val));
           }
         }}
-        className="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
+        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-950 outline-none focus:border-neutral-950"
       >
         <option value="">All Categories</option>
         <option value="uncategorized">Uncategorized Only</option>
@@ -133,7 +133,7 @@ export default function CategoryFilter({
         ))}
       </select>
       {selectedCategoryId && selectedCategoryId !== "uncategorized" && (
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+        <p className="mt-1 text-sm text-neutral-500">
           Showing this category and all subcategories
         </p>
       )}

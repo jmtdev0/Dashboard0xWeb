@@ -209,6 +209,15 @@ El dashboard privado requiere autenticación con contraseña y permite gestionar
    PRIVATE_AUTH_SECRET=<secret_generado>
    ```
 
+5. Opcional: generar una API key read-only para integraciones como Pop Agent:
+   ```bash
+   openssl rand -hex 32
+   ```
+
+   ```env
+   TODOS_API_KEY=<api_key_generada>
+   ```
+
 ### Acceso
 
 - **URL**: `/private`
@@ -224,6 +233,33 @@ El dashboard privado requiere autenticación con contraseña y permite gestionar
 - ✅ **Datos aislados** - crypto data excluida de API pública
 - ✅ **HTTPS enforced** por Netlify
 - ✅ **Anti brute-force** con delay de 1 segundo en fallos
+
+### API Read-Only para Integraciones
+
+Pop Agent y otras integraciones pueden leer TODOs sin usar la sesión web:
+
+```bash
+curl -H "Authorization: Bearer <TODOS_API_KEY>" \
+  "https://develop--dashboard0x.netlify.app/api/integrations/todos?status=active"
+```
+
+También se acepta la cabecera `X-API-Key: <TODOS_API_KEY>`.
+
+Filtros disponibles:
+- `status=all` - devuelve todos los TODOs (por defecto)
+- `status=active` - devuelve solo TODOs pendientes
+- `status=completed` - devuelve solo TODOs completados
+
+Respuesta:
+
+```json
+{
+  "todos": [],
+  "count": 0,
+  "status": "active",
+  "lastModified": "2026-01-01T00:00:00.000Z"
+}
+```
 
 ## Sistema de Categorías para TODOs
 

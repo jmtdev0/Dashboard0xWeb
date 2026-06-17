@@ -9,14 +9,21 @@ interface TodoViewProps {
 
 export default function TodoView({ token, onBack }: TodoViewProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-300 via-sky-200 to-blue-100 dark:from-sky-900 dark:to-blue-800">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <header className="mb-8">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-white text-neutral-950">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
+        <header className="mb-8 border-b border-neutral-200 pb-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                Private tools
+              </p>
+              <h1 className="mt-2 text-3xl font-black text-neutral-950 md:text-4xl">
+                TODO Manager
+              </h1>
+            </div>
             <button
               onClick={onBack}
-              className="px-4 py-3 bg-slate-700 hover:bg-slate-800 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center gap-2"
+              className="inline-flex items-center gap-2 rounded-md border border-neutral-950 bg-white px-4 py-2 text-sm font-bold text-neutral-950 transition-colors hover:bg-neutral-950 hover:text-white"
               aria-label="Back to menu"
             >
               <svg
@@ -34,14 +41,9 @@ export default function TodoView({ token, onBack }: TodoViewProps) {
               </svg>
               <span className="hidden sm:inline">Back</span>
             </button>
-
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-sky-50">
-              TODO Manager
-            </h1>
           </div>
         </header>
 
-        {/* Todo Manager */}
         <TodoManager token={token} />
       </div>
     </div>

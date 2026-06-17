@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { validateToken } from "@/lib/auth-utils";
-import { getAllTodos, saveTodos, generateTodoId } from "@/lib/todos-storage";
+import {
+  getAllTodos,
+  saveTodos,
+  generateTodoId,
+  getNextTodoNumber,
+} from "@/lib/todos-storage";
 import { Todo } from "@/lib/types/todo";
 
 /**
@@ -121,6 +126,7 @@ export async function POST(request: Request) {
 
     const newTodo: Todo = {
       id: generateTodoId(),
+      todoNumber: getNextTodoNumber(todos),
       text: text.trim(),
       completed: false,
       pinned: false,

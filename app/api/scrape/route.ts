@@ -48,7 +48,16 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      results: results.results,
+      results: {
+        youtube: results.results.youtube,
+        twitter: results.results.twitter,
+        instagram: results.results.instagram,
+        github: results.results.github,
+        extensions: results.results.extensions,
+        websites: results.results.websites,
+        chromeExtensions: results.results.chromeExtensions,
+        bethecandle: results.results.bethecandle,
+      },
     });
   } catch (error) {
     console.error("❌ [SCRAPE] Manual scraper failed:", error);

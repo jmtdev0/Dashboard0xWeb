@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS dashboard (
 -- Tabla para TODOs (normalizada - un registro por TODO)
 CREATE TABLE IF NOT EXISTS todos (
   id VARCHAR(50) PRIMARY KEY,
+  todo_number INTEGER NOT NULL UNIQUE,
   text TEXT NOT NULL CHECK (LENGTH(text) >= 1 AND LENGTH(text) <= 500),
   completed BOOLEAN NOT NULL DEFAULT FALSE,
   pinned BOOLEAN NOT NULL DEFAULT FALSE,
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS todos (
 -- Índices para mejorar performance
 CREATE INDEX IF NOT EXISTS idx_dashboard_updated ON dashboard(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_todos_created ON todos(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_todos_number ON todos(todo_number ASC);
 CREATE INDEX IF NOT EXISTS idx_todos_completed ON todos(completed);
 CREATE INDEX IF NOT EXISTS idx_todos_completed_at ON todos(completed_at DESC) WHERE completed_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_todos_pinned ON todos(pinned DESC, created_at DESC);

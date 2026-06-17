@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDashboardData } from "@/lib/dashboard-storage";
+import { filterChromeExtensions } from "@/lib/public-exclusions";
 
 export async function GET() {
   console.log("📊 [RESULTS] Fetching public dashboard data");
@@ -27,7 +28,12 @@ export async function GET() {
         twitter: data.results.twitter,
         instagram: data.results.instagram,
         github: data.results.github,
-        extensions: data.results.extensions,
+        extensions: filterChromeExtensions(data.results.extensions),
+        websites: data.results.websites ?? [],
+        chromeExtensions: filterChromeExtensions(
+          data.results.chromeExtensions ?? []
+        ),
+        bethecandle: data.results.bethecandle,
         // crypto: intentionally excluded from public API
       },
     };

@@ -1,5 +1,6 @@
 export interface Todo {
   id: string;
+  todoNumber: number;
   text: string;
   completed: boolean;
   pinned: boolean;

@@ -26,7 +26,6 @@ export default function CategorySelector({
   selectedCategoryId,
   onSelect,
 }: CategorySelectorProps) {
-  const [categories, setCategories] = useState<CategoryTree[]>([]);
   const [flatCategories, setFlatCategories] = useState<Array<{id: string, name: string, level: number}>>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +46,6 @@ export default function CategorySelector({
       }
 
       const data = await response.json();
-      setCategories(data);
       setFlatCategories(getAllCategoriesFlat(data));
     } catch (err) {
       console.error("Failed to load categories:", err);
@@ -73,10 +71,10 @@ export default function CategorySelector({
   if (loading) {
     return (
       <div className="mb-4">
-        <label className="block text-sm font-medium mb-2 dark:text-slate-100">
+        <label className="mb-2 block text-sm font-bold text-neutral-950">
           Category
         </label>
-        <select disabled className="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600">
+        <select disabled className="w-full rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-neutral-500">
           <option>Loading...</option>
         </select>
       </div>
@@ -85,13 +83,13 @@ export default function CategorySelector({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium mb-2 dark:text-slate-100">
+      <label className="mb-2 block text-sm font-bold text-neutral-950">
         Category
       </label>
       <select
         value={selectedCategoryId || ""}
         onChange={(e) => onSelect(e.target.value || null)}
-        className="w-full px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
+        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-950 outline-none focus:border-neutral-950"
       >
         <option value="">Uncategorized</option>
         {flatCategories.map((cat) => (

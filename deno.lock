@@ -21,6 +21,7 @@
         "npm:@types/node@20",
         "npm:@types/react-dom@19",
         "npm:@types/react@19",
+        "npm:@types/three@~0.184.1",
         "npm:axios@^1.13.2",
         "npm:babel-plugin-react-compiler@1.0.0",
         "npm:bcryptjs@^3.0.3",
@@ -30,10 +31,10 @@
         "npm:eslint@9",
         "npm:jsonwebtoken@^9.0.3",
         "npm:next@16.1.2",
-        "npm:puppeteer@^24.35.0",
         "npm:react-dom@19.2.3",
         "npm:react@19.2.3",
         "npm:tailwindcss@4",
+        "npm:three@0.184",
         "npm:tsx@^4.21.0",
         "npm:typescript@5"
       ]

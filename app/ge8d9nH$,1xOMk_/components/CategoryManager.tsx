@@ -160,11 +160,11 @@ export default function CategoryManager({ token, onClose }: CategoryManagerProps
   const renderCategoryTree = (items: CategoryTree[], level: number = 0) => {
     return items.map((category) => (
       <div key={category.id} style={{ marginLeft: `${level * 20}px` }}>
-        <div className="flex items-center gap-2 py-2 px-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded">
+        <div className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-neutral-100">
           {category.children.length > 0 && (
             <button
               onClick={() => toggleExpanded(category.id)}
-              className="text-slate-600 dark:text-slate-400"
+              className="text-neutral-600"
             >
               {expandedIds.has(category.id) ? "▼" : "▶"}
             </button>
@@ -176,12 +176,12 @@ export default function CategoryManager({ token, onClose }: CategoryManagerProps
                 type="text"
                 value={editingName}
                 onChange={(e) => setEditingName(e.target.value)}
-                className="flex-1 px-2 py-1 border rounded dark:bg-slate-800 dark:border-slate-600"
+                className="flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-neutral-950 outline-none focus:border-neutral-950"
                 autoFocus
               />
               <button
                 onClick={() => handleUpdateCategory(category.id)}
-                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="rounded-md border border-neutral-950 bg-neutral-950 px-3 py-1 font-bold text-white transition-colors hover:bg-white hover:text-neutral-950"
               >
                 Save
               </button>
@@ -190,32 +190,32 @@ export default function CategoryManager({ token, onClose }: CategoryManagerProps
                   setEditingId(null);
                   setEditingName("");
                 }}
-                className="px-3 py-1 bg-slate-400 text-white rounded hover:bg-slate-500"
+                className="rounded-md border border-neutral-300 bg-white px-3 py-1 font-bold text-neutral-950 transition-colors hover:border-neutral-950"
               >
                 Cancel
               </button>
             </div>
           ) : (
             <>
-              <span className="flex-1 dark:text-slate-100">{category.name}</span>
+              <span className="flex-1 text-neutral-950">{category.name}</span>
               <button
                 onClick={() => {
                   setEditingId(category.id);
                   setEditingName(category.name);
                 }}
-                className="px-2 py-1 text-sm text-blue-600 hover:underline"
+                className="px-2 py-1 text-sm font-bold text-neutral-950 hover:underline"
               >
                 Edit
               </button>
               <button
                 onClick={() => setSelectedParentId(category.id)}
-                className="px-2 py-1 text-sm text-green-600 hover:underline"
+                className="px-2 py-1 text-sm font-bold text-neutral-950 hover:underline"
               >
                 Add Sub
               </button>
               <button
                 onClick={() => handleDeleteCategory(category.id)}
-                className="px-2 py-1 text-sm text-red-600 hover:underline"
+                className="px-2 py-1 text-sm font-bold text-neutral-950 hover:underline"
               >
                 Delete
               </button>
@@ -243,50 +243,50 @@ export default function CategoryManager({ token, onClose }: CategoryManagerProps
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-          <p className="dark:text-slate-100">Loading categories...</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-md border border-neutral-950 bg-white p-6">
+          <p className="font-bold text-neutral-950">Loading categories...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-md border border-neutral-950 bg-white p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold dark:text-slate-100">Manage Categories</h2>
+          <h2 className="text-2xl font-black text-neutral-950">Manage Categories</h2>
           <button
             onClick={onClose}
-            className="text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+            className="rounded-md border border-neutral-300 px-3 py-1 font-bold text-neutral-950 transition-colors hover:border-neutral-950"
           >
             ✕
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+          <div className="mb-4 rounded-md border border-neutral-950 bg-white p-3 font-semibold text-neutral-950">
             {error}
           </div>
         )}
 
         <form onSubmit={handleCreateCategory} className="mb-6">
-          <label className="block text-sm font-medium mb-2 dark:text-slate-100">
+          <label className="mb-2 block text-sm font-bold text-neutral-950">
             New Category
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               type="text"
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
               placeholder="Category name"
-              className="flex-1 px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
+              className="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-950 outline-none placeholder:text-neutral-500 focus:border-neutral-950"
               maxLength={100}
             />
             <select
               value={selectedParentId || ""}
               onChange={(e) => setSelectedParentId(e.target.value || null)}
-              className="px-3 py-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
+              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-950 outline-none focus:border-neutral-950"
             >
               <option value="">Root Level</option>
               {getAllCategoriesFlat(categories).map((cat) => (
@@ -298,17 +298,17 @@ export default function CategoryManager({ token, onClose }: CategoryManagerProps
             <button
               type="submit"
               disabled={!newCategoryName.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
+              className="rounded-md border border-neutral-950 bg-neutral-950 px-4 py-2 font-bold text-white transition-colors hover:bg-white hover:text-neutral-950 disabled:cursor-not-allowed disabled:border-neutral-300 disabled:bg-neutral-100 disabled:text-neutral-400"
             >
               Add
             </button>
           </div>
         </form>
 
-        <div className="border-t pt-4 dark:border-slate-600">
-          <h3 className="text-lg font-semibold mb-3 dark:text-slate-100">Categories Tree</h3>
+        <div className="border-t border-neutral-200 pt-4">
+          <h3 className="mb-3 text-lg font-black text-neutral-950">Categories Tree</h3>
           {categories.length === 0 ? (
-            <p className="text-slate-500 dark:text-slate-400">No categories yet. Create one above!</p>
+            <p className="text-neutral-500">No categories yet. Create one above!</p>
           ) : (
             <div className="space-y-1">{renderCategoryTree(categories)}</div>
           )}
