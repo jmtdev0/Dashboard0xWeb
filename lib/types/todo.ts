@@ -2,6 +2,7 @@ export interface Todo {
   id: string;
   todoNumber: number;
   text: string;
+  description: string;
   completed: boolean;
   pinned: boolean;
   createdAt: string; // ISO 8601 timestamp

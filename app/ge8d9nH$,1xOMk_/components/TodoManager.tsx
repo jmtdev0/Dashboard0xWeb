@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Todo, SortOption, FilterOption } from "@/lib/types/todo";
 import CategoryManager from "./CategoryManager";
 import CategorySelector from "./CategorySelector";
@@ -18,6 +19,7 @@ interface ContextMenuState {
 }
 
 export default function TodoManager({ token }: TodoManagerProps) {
+  const router = useRouter();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,6 @@ export default function TodoManager({ token }: TodoManagerProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [categoryFilterIds, setCategoryFilterIds] = useState<string[]>([]);
-  const [detailTodo, setDetailTodo] = useState<Todo | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -226,8 +227,8 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const handleViewDetails = (todo: Todo) => {
-    setDetailTodo(todo);
     setContextMenu({ visible: false, x: 0, y: 0, todoId: null });
+    router.push(`/ge8d9nH$,1xOMk_/todos/${todo.todoNumber}`);
   };
 
   const handleSaveEdit = async (todo: Todo) => {
@@ -454,12 +455,6 @@ export default function TodoManager({ token }: TodoManagerProps) {
   };
 
   const selectedTodo = todos.find((t) => t.id === contextMenu.todoId);
-  const visibleDetailTodo = detailTodo
-    ? todos.find((todo) => todo.id === detailTodo.id) ?? detailTodo
-    : null;
-  const detailCategory = visibleDetailTodo
-    ? getCategoryBreadcrumb(visibleDetailTodo.categoryId) ?? "Uncategorized"
-    : null;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -893,107 +888,6 @@ export default function TodoManager({ token }: TodoManagerProps) {
         />
       )}
 
-      {visibleDetailTodo && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setDetailTodo(null)}
-        >
-          <div
-            className="w-full max-w-3xl rounded-md border border-neutral-950 bg-white p-6 text-neutral-950"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="todo-detail-title"
-          >
-            <div className="mb-6 flex items-start justify-between gap-4 border-b border-neutral-200 pb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
-                  TODO #{visibleDetailTodo.todoNumber}
-                </p>
-                <h2 id="todo-detail-title" className="mt-2 text-2xl font-black">
-                  Detail
-                </h2>
-              </div>
-              <button
-                onClick={() => setDetailTodo(null)}
-                className="rounded-md border border-neutral-300 px-3 py-1 font-bold transition-colors hover:border-neutral-950"
-                aria-label="Close detail"
-              >
-                X
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <p className="mb-2 text-sm font-bold uppercase text-neutral-500">
-                  Title
-                </p>
-                <p className="whitespace-pre-wrap break-words text-xl font-bold leading-relaxed">
-                  {visibleDetailTodo.text}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-xs font-bold uppercase text-neutral-500">Status</p>
-                  <p className="mt-1 font-bold">
-                    {visibleDetailTodo.completed ? "Completed" : "Active"}
-                  </p>
-                </div>
-                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-xs font-bold uppercase text-neutral-500">Pinned</p>
-                  <p className="mt-1 font-bold">
-                    {visibleDetailTodo.pinned ? "Yes" : "No"}
-                  </p>
-                </div>
-                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-xs font-bold uppercase text-neutral-500">Category</p>
-                  <p className="mt-1 font-bold">{detailCategory}</p>
-                </div>
-                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-xs font-bold uppercase text-neutral-500">Internal ID</p>
-                  <p className="mt-1 break-all font-mono text-sm">{visibleDetailTodo.id}</p>
-                </div>
-                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-xs font-bold uppercase text-neutral-500">Created</p>
-                  <p className="mt-1 font-bold">
-                    {new Date(visibleDetailTodo.createdAt).toLocaleString()}
-                  </p>
-                </div>
-                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                  <p className="text-xs font-bold uppercase text-neutral-500">Completed</p>
-                  <p className="mt-1 font-bold">
-                    {visibleDetailTodo.completedAt
-                      ? new Date(visibleDetailTodo.completedAt).toLocaleString()
-                      : "Not completed"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 border-t border-neutral-200 pt-4 sm:flex-row">
-                <button
-                  onClick={() => {
-                    setDetailTodo(null);
-                    handleStartEdit(visibleDetailTodo);
-                  }}
-                  className="flex-1 rounded-md border border-neutral-950 bg-neutral-950 px-4 py-2 font-bold text-white transition-colors hover:bg-white hover:text-neutral-950"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => {
-                    setDetailTodo(null);
-                    handleTogglePin(visibleDetailTodo);
-                  }}
-                  className="flex-1 rounded-md border border-neutral-300 bg-white px-4 py-2 font-bold transition-colors hover:border-neutral-950"
-                >
-                  {visibleDetailTodo.pinned ? "Unpin" : "Pin"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

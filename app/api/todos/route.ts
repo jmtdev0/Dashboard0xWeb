@@ -128,6 +128,7 @@ export async function POST(request: Request) {
       id: generateTodoId(),
       todoNumber: getNextTodoNumber(todos),
       text: text.trim(),
+      description: "",
       completed: false,
       pinned: false,
       createdAt: new Date().toISOString(),
@@ -162,7 +163,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const { id, text, completed, pinned, categoryId } = await request.json();
+    const { id, text, description, completed, pinned, categoryId } = await request.json();
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
@@ -187,6 +188,21 @@ export async function PUT(request: Request) {
       }
     }
 
+    if (description !== undefined) {
+      if (typeof description !== "string") {
+        return NextResponse.json(
+          { error: "Description must be text" },
+          { status: 400 }
+        );
+      }
+      if (description.length > 10000) {
+        return NextResponse.json(
+          { error: "Description too long (max 10000 characters)" },
+          { status: 400 }
+        );
+      }
+    }
+
     const { todos } = await getAllTodos();
     const todoIndex = todos.findIndex((t) => t.id === id);
 
@@ -197,6 +213,7 @@ export async function PUT(request: Request) {
     const updatedTodo: Todo = {
       ...todos[todoIndex],
       ...(text !== undefined && { text: text.trim() }),
+      ...(description !== undefined && { description: description.trim() }),
       ...(completed !== undefined && {
         completed,
         completedAt: completed ? new Date().toISOString() : null,

@@ -4,6 +4,9 @@
 ALTER TABLE todos
 ADD COLUMN IF NOT EXISTS todo_number INTEGER;
 
+ALTER TABLE todos
+ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+
 WITH numbered AS (
   SELECT
     id,

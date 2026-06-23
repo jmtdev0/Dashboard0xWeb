@@ -6,18 +6,22 @@ import path from "path";
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".local-data");
 const LOCAL_TODOS_FILE = path.join(LOCAL_DATA_DIR, "todos-data.json");
 
-type StoredTodo = Omit<Todo, "todoNumber"> & { todoNumber?: number | null };
+type StoredTodo = Omit<Todo, "todoNumber" | "description"> & {
+  todoNumber?: number | null;
+  description?: string | null;
+};
 type TodoRow = {
   id: string;
   todoNumber: number;
   text: string;
+  description: string | null;
   completed: boolean;
   pinned: boolean;
   createdAt: string;
   completedAt: string | null;
   categoryId: string | null;
 };
-type LegacyTodoRow = Omit<TodoRow, "todoNumber">;
+type LegacyTodoRow = Omit<TodoRow, "todoNumber" | "description">;
 
 let todoNumberColumnReady = false;
 
@@ -49,7 +53,7 @@ function normalizeTodosWithNumbers(todos: StoredTodo[]): Todo[] {
           : getNextNumber();
 
       usedNumbers.add(existingNumber);
-      return { ...todo, todoNumber: existingNumber };
+      return { ...todo, todoNumber: existingNumber, description: todo.description ?? "" };
     })
     .sort(
       (a, b) =>
@@ -67,6 +71,7 @@ function mapTodoRows(rows: TodoRow[]): Todo[] {
     id: row.id,
     todoNumber: row.todoNumber,
     text: row.text,
+    description: row.description ?? "",
     completed: row.completed,
     pinned: row.pinned,
     createdAt: row.createdAt,
@@ -80,6 +85,7 @@ function mapLegacyTodoRows(rows: LegacyTodoRow[]): Todo[] {
     rows.map((row) => ({
       id: row.id,
       text: row.text,
+      description: "",
       completed: row.completed,
       pinned: row.pinned,
       createdAt: row.createdAt,
@@ -93,6 +99,7 @@ async function ensureTodoNumberColumn(sql: ReturnType<typeof neon>): Promise<voi
   if (todoNumberColumnReady) return;
 
   await sql`ALTER TABLE todos ADD COLUMN IF NOT EXISTS todo_number INTEGER`;
+  await sql`ALTER TABLE todos ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`;
   await sql`
     WITH numbered AS (
       SELECT
@@ -193,6 +200,7 @@ export async function getAllTodos(): Promise<TodoListData> {
         id,
         text,
         todo_number as "todoNumber",
+        description,
         completed,
         pinned,
         created_at as "createdAt",
@@ -282,11 +290,12 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
     // Upsert each TODO (insert or update if exists)
     for (const todo of todos) {
       await sql`
-        INSERT INTO todos (id, todo_number, text, completed, pinned, created_at, completed_at, category_id)
+        INSERT INTO todos (id, todo_number, text, description, completed, pinned, created_at, completed_at, category_id)
         VALUES (
           ${todo.id},
           ${todo.todoNumber},
           ${todo.text},
+          ${todo.description},
           ${todo.completed},
           ${todo.pinned},
           ${todo.createdAt},
@@ -296,6 +305,7 @@ export async function saveTodos(todos: Todo[]): Promise<void> {
         ON CONFLICT (id) DO UPDATE SET
           todo_number = EXCLUDED.todo_number,
           text = EXCLUDED.text,
+          description = EXCLUDED.description,
           completed = EXCLUDED.completed,
           pinned = EXCLUDED.pinned,
           completed_at = EXCLUDED.completed_at,

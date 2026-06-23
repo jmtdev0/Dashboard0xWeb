@@ -5,6 +5,10 @@ import { MusicController } from "@/app/components/music-controller";
 import { ProjectMap3D } from "@/app/components/project-map-3d";
 import { ProjectMapPlayroom } from "@/app/components/project-map-playroom";
 import {
+  ProjectMapSimple,
+  SIMPLE_CATEGORY_STYLES,
+} from "@/app/components/project-map-simple";
+import {
   CATEGORY_STYLES,
   STATUS_STYLES,
   buildProjectNodes,
@@ -18,7 +22,11 @@ import {
 } from "@/lib/public-project-map";
 import { MUSIC_TRACKS } from "@/lib/music-tracks";
 
-const DASHBOARD_VISUALIZATIONS = ["crystarium", "playroom"] as const;
+const DASHBOARD_VISUALIZATIONS = [
+  "simple",
+  "crystarium",
+  "playroom",
+] as const;
 
 type DashboardVisualization = (typeof DASHBOARD_VISUALIZATIONS)[number];
 
@@ -27,26 +35,21 @@ export default function Dashboard() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
+  const [legacyActiveCategory, setLegacyActiveCategory] =
+    useState<CategoryId | null>(null);
+  const [openCategories, setOpenCategories] = useState<Set<CategoryId>>(
+    () => new Set()
+  );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [visualization, setVisualization] =
-    useState<DashboardVisualization | null>(null);
+    useState<DashboardVisualization>("simple");
 
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
-    const selected = selectInitialVisualization();
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    const timer = window.setTimeout(
-      () => setVisualization(selected),
-      reducedMotion ? 250 : 950
-    );
-
-    return () => window.clearTimeout(timer);
+    setVisualization(resolveVisualization(window.location.search));
   }, []);
 
   const dataState: DataState = data ? "ready" : error ? "error" : "loading";
@@ -57,9 +60,28 @@ export default function Dashboard() {
   const selectedNode =
     nodes.find((node) => node.id === selectedNodeId) ?? null;
 
-  const handleToggleCategory = (category: CategoryId) => {
-    setActiveCategory((current) => (current === category ? null : category));
+  const handleLegacyToggleCategory = (category: CategoryId) => {
+    setLegacyActiveCategory((current) =>
+      current === category ? null : category
+    );
     setSelectedNodeId(null);
+  };
+
+  const handleSimpleToggleCategory = (category: CategoryId) => {
+    setOpenCategories((current) => {
+      const next = new Set(current);
+
+      if (next.has(category)) {
+        next.delete(category);
+        if (selectedNode?.category === category) {
+          setSelectedNodeId(null);
+        }
+      } else {
+        next.add(category);
+      }
+
+      return next;
+    });
   };
 
   const loadData = async () => {
@@ -121,10 +143,16 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#020617] text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(168,85,247,0.24),transparent_34%),radial-gradient(circle_at_17%_24%,rgba(236,72,153,0.16),transparent_28%),radial-gradient(circle_at_82%_24%,rgba(59,130,246,0.18),transparent_30%)]" />
-
-      {!visualization && <VisualizationLoadingScreen />}
+    <div
+      className={`relative min-h-screen overflow-hidden text-slate-100 ${
+        visualization === "simple"
+          ? "bg-[#9a6048] dark:bg-[#1f120d]"
+          : "bg-[#020617] dark:bg-black"
+      }`}
+    >
+      {visualization !== "simple" && (
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(168,85,247,0.24),transparent_34%),radial-gradient(circle_at_17%_24%,rgba(236,72,153,0.16),transparent_28%),radial-gradient(circle_at_82%_24%,rgba(59,130,246,0.18),transparent_30%)]" />
+      )}
 
       {error && (
         <div
@@ -135,8 +163,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {visualization && (
-        <>
+      <>
           <button
             onClick={handleRefresh}
             disabled={initialLoading || refreshing}
@@ -154,26 +181,38 @@ export default function Dashboard() {
                   ? "Refreshing"
                   : "Refresh Now"
             }
-            className="fixed right-4 top-5 z-40 grid h-12 w-12 place-items-center rounded-lg border border-blue-300/30 bg-blue-500/15 text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.18)] transition hover:border-blue-300/60 hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60 sm:right-6 lg:right-8"
+            className={`fixed right-4 top-5 z-40 grid h-12 w-12 place-items-center rounded-lg border shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60 sm:right-6 lg:right-8 ${
+              visualization === "simple"
+                ? "border-[#321a12]/35 bg-[#321a12]/85 text-[#ffe9cf] hover:bg-[#321a12]"
+                : "border-blue-300/30 bg-blue-500/15 text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.18)] hover:border-blue-300/60 hover:bg-blue-500/25"
+            }`}
           >
             <RefreshIcon spinning={refreshing || initialLoading} />
           </button>
 
           <main className="fixed inset-0 z-10">
-            {visualization === "crystarium" ? (
+            {visualization === "simple" ? (
+              <ProjectMapSimple
+                nodes={nodes}
+                openCategories={openCategories}
+                selectedNodeId={selectedNodeId}
+                onToggleCategory={handleSimpleToggleCategory}
+                onSelectNode={setSelectedNodeId}
+              />
+            ) : visualization === "crystarium" ? (
               <ProjectMap3D
                 nodes={nodes}
-                activeCategory={activeCategory}
+                activeCategory={legacyActiveCategory}
                 selectedNodeId={selectedNodeId}
-                onToggleCategory={handleToggleCategory}
+                onToggleCategory={handleLegacyToggleCategory}
                 onSelectNode={setSelectedNodeId}
               />
             ) : (
               <ProjectMapPlayroom
                 nodes={nodes}
-                activeCategory={activeCategory}
+                activeCategory={legacyActiveCategory}
                 selectedNodeId={selectedNodeId}
-                onToggleCategory={handleToggleCategory}
+                onToggleCategory={handleLegacyToggleCategory}
                 onSelectNode={setSelectedNodeId}
               />
             )}
@@ -184,17 +223,17 @@ export default function Dashboard() {
           {selectedNode && (
             <DetailPanel
               node={selectedNode}
+              simpleView={visualization === "simple"}
               onClose={() => setSelectedNodeId(null)}
             />
           )}
-        </>
-      )}
+      </>
     </div>
   );
 }
 
-function selectInitialVisualization(): DashboardVisualization {
-  const requested = new URLSearchParams(window.location.search).get("view");
+function resolveVisualization(search: string): DashboardVisualization {
+  const requested = new URLSearchParams(search).get("view");
 
   if (
     requested &&
@@ -203,46 +242,32 @@ function selectInitialVisualization(): DashboardVisualization {
     return requested as DashboardVisualization;
   }
 
-  return DASHBOARD_VISUALIZATIONS[
-    Math.floor(Math.random() * DASHBOARD_VISUALIZATIONS.length)
-  ];
-}
-
-function VisualizationLoadingScreen() {
-  return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center overflow-hidden bg-[#07111f] text-white"
-      aria-busy="true"
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(96,165,250,0.22),transparent_32%),radial-gradient(circle_at_34%_70%,rgba(236,72,153,0.16),transparent_28%)]" />
-      <div className="relative flex flex-col items-center gap-5 text-center">
-        <div className="relative h-28 w-28">
-          <span className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white/70 bg-[radial-gradient(circle_at_32%_26%,#fff_0_10%,#60a5fa_11%_42%,#a855f7_72%)] shadow-[0_18px_34px_rgba(37,99,235,0.32)]" />
-          <span className="absolute left-1 top-4 h-9 w-9 rounded-full border-2 border-white/70 bg-[radial-gradient(circle_at_32%_26%,#fff_0_12%,#ec4899_13%_100%)] animate-bounce" />
-          <span className="absolute bottom-2 right-0 h-10 w-10 rounded-full border-2 border-white/70 bg-[radial-gradient(circle_at_32%_26%,#fff_0_12%,#f59e0b_13%_100%)] animate-pulse" />
-        </div>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-normal text-blue-200">
-            Choosing a view
-          </p>
-          <p className="mt-2 text-lg font-bold text-white">
-            Rolling the dashboard into place
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  return "simple";
 }
 
 function DetailPanel({
   node,
+  simpleView,
   onClose,
 }: {
   node: ProjectNode;
+  simpleView: boolean;
   onClose: () => void;
 }) {
   const categoryStyle = CATEGORY_STYLES[node.category];
+  const simpleCategoryStyle = SIMPLE_CATEGORY_STYLES[node.category];
   const status = STATUS_STYLES[node.status];
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   return (
     <aside className="fixed inset-x-4 bottom-4 z-40 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-white/15 bg-slate-950/95 p-5 shadow-2xl shadow-black/40 backdrop-blur-xl sm:left-auto sm:right-6 sm:top-20 sm:w-[390px]">
@@ -257,10 +282,13 @@ function DetailPanel({
 
       <div className="pr-10">
         <div className="flex items-center gap-4">
-          <NodeIcon node={node} />
+          <NodeIcon node={node} simpleView={simpleView} />
           <div>
             <p
-              className={`text-xs font-bold uppercase tracking-[0.18em] ${categoryStyle.accentClass}`}
+              className={`text-xs font-bold uppercase tracking-[0.18em] ${
+                simpleView ? "" : categoryStyle.accentClass
+              }`}
+              style={simpleView ? { color: simpleCategoryStyle.color } : undefined}
             >
               {categoryStyle.title}
             </p>
@@ -316,8 +344,31 @@ function DetailPanel({
   );
 }
 
-function NodeIcon({ node }: { node: ProjectNode }) {
+function NodeIcon({
+  node,
+  simpleView,
+}: {
+  node: ProjectNode;
+  simpleView: boolean;
+}) {
   const categoryStyle = CATEGORY_STYLES[node.category];
+
+  if (simpleView) {
+    const simpleCategoryStyle = SIMPLE_CATEGORY_STYLES[node.category];
+
+    return (
+      <span
+        className="grid h-14 w-14 shrink-0 place-items-center border-2 text-base font-black"
+        style={{
+          borderColor: simpleCategoryStyle.color,
+          color: simpleCategoryStyle.color,
+        }}
+        aria-hidden="true"
+      >
+        {node.icon}
+      </span>
+    );
+  }
 
   return (
     <span
